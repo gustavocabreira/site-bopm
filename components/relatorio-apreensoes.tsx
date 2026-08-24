@@ -120,6 +120,8 @@ export function RelatorioApreensoes() {
     gerarRelatorio({ from: range.from, to: range.to });
   }
 
+  const policialFiltrado = policial !== TODOS_POLICIAIS ? policial : null;
+
   function onPolicialChange(value: string | null) {
     const novoValor = value ?? TODOS_POLICIAIS;
     setPolicial(novoValor);
@@ -161,8 +163,18 @@ export function RelatorioApreensoes() {
 
       {resultado && (
         <>
+          {policialFiltrado && (
+            <p className="text-sm text-muted-foreground">
+              Mostrando apenas registros com <span className="font-medium text-foreground">{policialFiltrado}</span> na
+              equipe.
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatTile label="Boletins no período" value={resultado.totalBoletins} />
+            <StatTile
+              label={policialFiltrado ? "Boletins participados" : "Boletins no período"}
+              value={resultado.totalBoletins}
+            />
             <StatTile label="Indivíduos abordados/presos" value={resultado.individuos.length} />
             <StatTile
               label="Itens apreendidos"
@@ -171,7 +183,7 @@ export function RelatorioApreensoes() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-4 ${policialFiltrado ? "" : "lg:grid-cols-2"}`}>
             <Card className="border-border/60 shadow-sm">
               <CardHeader>
                 <CardTitle>Top itens mais apreendidos</CardTitle>
@@ -181,41 +193,43 @@ export function RelatorioApreensoes() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/60 shadow-sm">
-              <CardHeader>
-                <CardTitle>Ranking de prisões por policial</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {resultado.rankingPrisoes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma prisão com integrante de equipe registrado no período.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground/80">
-                          <th className="py-2 pr-4">#</th>
-                          <th className="py-2 pr-4">Policial</th>
-                          <th className="py-2 pr-4">Prisões</th>
-                          <th className="py-2">Boletins</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {resultado.rankingPrisoes.map((policial, index) => (
-                          <tr key={policial.policial} className="border-b border-border/30 last:border-0">
-                            <td className="py-2 pr-4 text-muted-foreground">{index + 1}</td>
-                            <td className="py-2 pr-4">{policial.policial}</td>
-                            <td className="py-2 pr-4">{policial.totalPresos}</td>
-                            <td className="py-2">{policial.totalBoletins}</td>
+            {!policialFiltrado && (
+              <Card className="border-border/60 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Ranking de prisões por policial</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {resultado.rankingPrisoes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma prisão com integrante de equipe registrado no período.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground/80">
+                            <th className="py-2 pr-4">#</th>
+                            <th className="py-2 pr-4">Policial</th>
+                            <th className="py-2 pr-4">Prisões</th>
+                            <th className="py-2">Boletins</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        </thead>
+                        <tbody>
+                          {resultado.rankingPrisoes.map((policial, index) => (
+                            <tr key={policial.policial} className="border-b border-border/30 last:border-0">
+                              <td className="py-2 pr-4 text-muted-foreground">{index + 1}</td>
+                              <td className="py-2 pr-4">{policial.policial}</td>
+                              <td className="py-2 pr-4">{policial.totalPresos}</td>
+                              <td className="py-2">{policial.totalBoletins}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <Card className="border-border/60 shadow-sm">
