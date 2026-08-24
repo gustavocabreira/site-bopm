@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import Link from "next/link";
-import { ShieldCheck, ListChecks } from "lucide-react";
+import { ShieldCheck, ListChecks, BarChart3 } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { UserMenu } from "@/components/user-menu";
 import { BoletimForm } from "@/components/boletim-form";
@@ -25,6 +25,10 @@ export default async function Home() {
             <Button variant="ghost" size="sm" className="gap-2" render={<Link href="/boletins" />}>
               <ListChecks className="size-4" />
               <span className="hidden sm:inline">Boletins</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-2" render={<Link href="/relatorios" />}>
+              <BarChart3 className="size-4" />
+              <span className="hidden sm:inline">Relatórios</span>
             </Button>
             <UserMenu name={session?.user?.name} image={session?.user?.image} />
           </div>

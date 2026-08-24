@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,15 @@ import {
 import { QUESTIONS, CREW_KEYS, type BoletimFields, type QuestionKey } from "@/lib/questions";
 import { buildBoletim, buildBoletimTextoPuro } from "@/lib/boletimTemplate";
 import { getDataHoraAtual } from "@/lib/dateFormatter";
-import type { EstadoBoletim } from "@/lib/boletimEstado";
+import type { EstadoBoletim, Individuo } from "@/lib/boletimEstado";
+import type { MaterialApreendido } from "@/lib/materiais";
 
 type Phase = "collecting" | "loading" | "review";
 
 interface ConteudoGerado {
   relato: string;
   natureza: string;
-  materiaisApreendidos: string | null;
+  materiaisApreendidos: MaterialApreendido[];
   artigos: string | null;
   avisos: string[];
 }
@@ -40,16 +42,15 @@ const EMPTY_FIELDS: BoletimFields = {
   motorista: "",
   homem3: "",
   homem4: "",
-  individuoNome: "",
-  individuoRG: "",
   local: "",
   veiculo: "",
   relatoBruto: "",
 };
 
+const EMPTY_INDIVIDUO: Individuo = { nome: "", rg: "" };
+
 const SECOES: { titulo: string; chaves: QuestionKey[] }[] = [
   { titulo: "Equipe", chaves: ["prefixo", "chefeEquipe", "motorista", "homem3", "homem4"] },
-  { titulo: "Indivíduo abordado", chaves: ["individuoNome", "individuoRG"] },
   { titulo: "Ocorrência", chaves: ["local", "veiculo", "relatoBruto"] },
 ];
 
@@ -62,8 +63,14 @@ function mostrarAvisos(avisos: string[]) {
   avisos.forEach((aviso) => toast.warning(aviso));
 }
 
+/** Remove linhas de indivíduo totalmente em branco (ex.: a linha padrão não preenchida). */
+function individuosPreenchidos(lista: Individuo[]): Individuo[] {
+  return lista.filter((individuo) => individuo.nome.trim() || individuo.rg.trim());
+}
+
 export function BoletimForm() {
   const [fields, setFields] = useState<BoletimFields>(EMPTY_FIELDS);
+  const [individuos, setIndividuos] = useState<Individuo[]>([{ ...EMPTY_INDIVIDUO }]);
   const [phase, setPhase] = useState<Phase>("collecting");
   const [conteudo, setConteudo] = useState<ConteudoGerado | null>(null);
   const [dataHora, setDataHora] = useState<{ data: string; horario: string } | null>(null);
@@ -88,10 +95,29 @@ export function BoletimForm() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  function adicionarIndividuo() {
+    setIndividuos((prev) => [...prev, { ...EMPTY_INDIVIDUO }]);
+  }
+
+  function removerIndividuo(index: number) {
+    setIndividuos((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateIndividuo(index: number, key: keyof Individuo, value: string) {
+    setIndividuos((prev) => prev.map((individuo, i) => (i === index ? { ...individuo, [key]: value } : individuo)));
+  }
+
   function validar(): boolean {
     for (const question of QUESTIONS) {
       if (!question.optional && !fields[question.key].trim()) {
         toast.error(`Preencha o campo "${question.label}".`);
+        return false;
+      }
+    }
+    for (const individuo of individuos) {
+      const temAlgumDado = individuo.nome.trim() || individuo.rg.trim();
+      if (temAlgumDado && !individuo.nome.trim()) {
+        toast.error("Preencha o nome do indivíduo (ou deixe a linha totalmente em branco).");
         return false;
       }
     }
@@ -137,8 +163,7 @@ export function BoletimForm() {
         motorista: fields.motorista,
         homem3: fields.homem3,
         homem4: fields.homem4,
-        individuoNome: fields.individuoNome,
-        individuoRG: fields.individuoRG,
+        individuos: individuosPreenchidos(individuos),
         local: fields.local,
         veiculo: fields.veiculo,
         relato: conteudo.relato,
@@ -167,11 +192,10 @@ export function BoletimForm() {
         motorista: estadoAtualizado.motorista,
         homem3: estadoAtualizado.homem3,
         homem4: estadoAtualizado.homem4,
-        individuoNome: estadoAtualizado.individuoNome,
-        individuoRG: estadoAtualizado.individuoRG,
         local: estadoAtualizado.local,
         veiculo: estadoAtualizado.veiculo,
       }));
+      setIndividuos(estadoAtualizado.individuos);
       setConteudo({
         relato: estadoAtualizado.relato,
         natureza: estadoAtualizado.natureza,
@@ -192,8 +216,10 @@ export function BoletimForm() {
     if (!conteudo || !dataHora) return;
     setConfirmOpen(false);
 
+    const individuosParaSalvar = individuosPreenchidos(individuos);
     const texto = buildBoletimTextoPuro({
       ...fields,
+      individuos: individuosParaSalvar,
       data: dataHora.data,
       horario: dataHora.horario,
       natureza: conteudo.natureza,
@@ -219,9 +245,12 @@ export function BoletimForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prefixo: fields.prefixo,
+          chefeEquipe: fields.chefeEquipe,
           local: fields.local,
           natureza: conteudo.natureza,
           texto,
+          individuos: individuosParaSalvar,
+          materiais: conteudo.materiaisApreendidos,
         }),
       }).catch(() => {}),
     ]);
@@ -234,14 +263,15 @@ export function BoletimForm() {
     const base = dataHora ?? { data: "__/__/____", horario: "__:__" };
     return buildBoletim({
       ...fields,
+      individuos: individuosPreenchidos(individuos),
       data: base.data,
       horario: base.horario,
       natureza: conteudo?.natureza ?? "—",
-      materiaisApreendidos: conteudo?.materiaisApreendidos ?? "",
+      materiaisApreendidos: conteudo?.materiaisApreendidos ?? [],
       relato: conteudo?.relato || fields.relatoBruto || "—",
       artigos: conteudo?.artigos ?? "",
     });
-  }, [fields, conteudo, dataHora]);
+  }, [fields, individuos, conteudo, dataHora]);
 
   async function copiarTexto() {
     if (!conteudo || !dataHora) {
@@ -250,6 +280,7 @@ export function BoletimForm() {
     }
     const texto = buildBoletimTextoPuro({
       ...fields,
+      individuos: individuosPreenchidos(individuos),
       data: dataHora.data,
       horario: dataHora.horario,
       natureza: conteudo.natureza,
@@ -269,6 +300,7 @@ export function BoletimForm() {
   function novoBoletim() {
     const crewPrefill = Object.fromEntries(CREW_KEYS.map((key) => [key, fields[key]]));
     setFields({ ...EMPTY_FIELDS, ...crewPrefill });
+    setIndividuos([{ ...EMPTY_INDIVIDUO }]);
     setConteudo(null);
     setDataHora(null);
     setPublicado(false);
@@ -298,7 +330,7 @@ export function BoletimForm() {
               <CardTitle>Emissão de Boletim de Ocorrência</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-7">
-              {SECOES.map((secao) => (
+              {SECOES.map((secao, index) => (
                 <div key={secao.titulo} className="flex flex-col gap-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
                     {secao.titulo}
@@ -338,6 +370,59 @@ export function BoletimForm() {
                       );
                     })}
                   </div>
+
+                  {index === 0 && (
+                    <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+                        Indivíduos abordados
+                      </h3>
+                      {individuos.map((individuo, individuoIndex) => (
+                          <div key={individuoIndex} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                            <div className="flex flex-col gap-1.5">
+                              <Label htmlFor={`individuo-nome-${individuoIndex}`}>
+                                Nome e sobrenome {individuos.length > 1 ? `(${individuoIndex + 1})` : ""}
+                              </Label>
+                              <Input
+                                id={`individuo-nome-${individuoIndex}`}
+                                placeholder="Nome completo do indivíduo"
+                                value={individuo.nome}
+                                onChange={(e) => updateIndividuo(individuoIndex, "nome", e.target.value)}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <Label htmlFor={`individuo-rg-${individuoIndex}`}>RG</Label>
+                              <Input
+                                id={`individuo-rg-${individuoIndex}`}
+                                placeholder="Deixe em branco se não houver"
+                                value={individuo.rg}
+                                onChange={(e) => updateIndividuo(individuoIndex, "rg", e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removerIndividuo(individuoIndex)}
+                                aria-label="Remover indivíduo"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit gap-1.5"
+                        onClick={adicionarIndividuo}
+                      >
+                        <Plus className="size-3.5" />
+                        Adicionar indivíduo
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </CardContent>

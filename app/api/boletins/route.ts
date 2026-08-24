@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { prefixo, local, natureza, texto } = body ?? {};
+  const { prefixo, chefeEquipe, local, natureza, texto, individuos, materiais } = body ?? {};
 
   if (!prefixo || !local || !natureza || !texto) {
     return NextResponse.json({ error: "Dados incompletos para salvar o boletim." }, { status: 400 });
@@ -30,9 +30,12 @@ export async function POST(request: Request) {
     discordUserId: session.user.id,
     discordUserName: session.user.name ?? null,
     prefixo,
+    chefeEquipe: chefeEquipe ?? "",
     local,
     natureza,
     texto,
+    individuos: Array.isArray(individuos) ? individuos : [],
+    materiais: Array.isArray(materiais) ? materiais : [],
   });
 
   return NextResponse.json({ ok: true });

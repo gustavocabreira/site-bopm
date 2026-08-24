@@ -1,3 +1,6 @@
+import type { Individuo } from "./boletimEstado";
+import { formatarMateriaisApreendidos, type MaterialApreendido } from "./materiais";
+
 const SEPARADOR = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
 
 export interface BoletimData {
@@ -8,14 +11,41 @@ export interface BoletimData {
   motorista: string;
   homem3: string;
   homem4: string;
-  individuoNome: string;
-  individuoRG: string;
+  individuos: Individuo[];
   natureza: string;
   local: string;
   veiculo: string;
-  materiaisApreendidos: string | null;
+  materiaisApreendidos: MaterialApreendido[];
   relato: string;
   artigos: string | null;
+}
+
+function linhasIndividuos(individuos: Individuo[], markdown: boolean): string[] {
+  if (individuos.length === 0) {
+    const label = markdown ? "**IDENTIFICAÇÃO DO INDIVÍDUO:**" : "IDENTIFICAÇÃO DO INDIVÍDUO:";
+    return [label, markdown ? "**Nome e Sobrenome:** " : "Nome e Sobrenome: ", markdown ? "**RG:** " : "RG: "];
+  }
+
+  const titulo =
+    individuos.length > 1
+      ? markdown
+        ? "**IDENTIFICAÇÃO DOS INDIVÍDUOS:**"
+        : "IDENTIFICAÇÃO DOS INDIVÍDUOS:"
+      : markdown
+        ? "**IDENTIFICAÇÃO DO INDIVÍDUO:**"
+        : "IDENTIFICAÇÃO DO INDIVÍDUO:";
+
+  const linhas = [titulo];
+  individuos.forEach((individuo, index) => {
+    const prefixoNumero = individuos.length > 1 ? `${index + 1}. ` : "";
+    linhas.push(
+      markdown
+        ? `**${prefixoNumero}Nome e Sobrenome:** ${individuo.nome}`
+        : `${prefixoNumero}Nome e Sobrenome: ${individuo.nome}`,
+    );
+    linhas.push(markdown ? `**RG:** ${individuo.rg}` : `RG: ${individuo.rg}`);
+  });
+  return linhas;
 }
 
 /**
@@ -40,13 +70,12 @@ export function buildBoletim(fields: BoletimData): string {
     "",
     "# DADOS DA OCORRÊNCIA",
     "",
-    "**IDENTIFICAÇÃO DO INDIVÍDUO:**",
-    `**Nome e Sobrenome:** ${fields.individuoNome || ""}`,
-    `**RG:** ${fields.individuoRG || ""}`,
+    ...linhasIndividuos(fields.individuos, true),
     `**NATUREZA DOS FATOS:** ${fields.natureza}`,
     `**LOCAL DA OCORRÊNCIA:** ${fields.local}`,
     `**VEÍCULO DO INDIVÍDUO:** ${fields.veiculo || ""}`,
-    `**MATERIAIS ILÍCITOS APREENDIDOS:** ${fields.materiaisApreendidos || ""}`,
+    `**MATERIAIS ILÍCITOS APREENDIDOS:**`,
+    formatarMateriaisApreendidos(fields.materiaisApreendidos),
     SEPARADOR,
     "# RELATO DA OCORRÊNCIA",
     fields.relato,
@@ -80,13 +109,12 @@ export function buildBoletimTextoPuro(fields: BoletimData): string {
     "",
     "DADOS DA OCORRÊNCIA",
     "",
-    "IDENTIFICAÇÃO DO INDIVÍDUO:",
-    `Nome e Sobrenome: ${fields.individuoNome || ""}`,
-    `RG: ${fields.individuoRG || ""}`,
+    ...linhasIndividuos(fields.individuos, false),
     `NATUREZA DOS FATOS: ${fields.natureza}`,
     `LOCAL DA OCORRÊNCIA: ${fields.local}`,
     `VEÍCULO DO INDIVÍDUO: ${fields.veiculo || ""}`,
-    `MATERIAIS ILÍCITOS APREENDIDOS: ${fields.materiaisApreendidos || ""}`,
+    `MATERIAIS ILÍCITOS APREENDIDOS:`,
+    formatarMateriaisApreendidos(fields.materiaisApreendidos),
     SEPARADOR,
     "RELATO DA OCORRÊNCIA",
     fields.relato,

@@ -33,3 +33,13 @@ alter table boletins enable row level security;
 
 -- Apenas a service role (usada nas API routes do servidor) acessa esta tabela;
 -- nenhuma policy é criada para anon/authenticated de propósito.
+
+-- Migracao: suporte a multiplos individuos abordados e materiais apreendidos
+-- estruturados por boletim, usados no relatorio agregado por periodo.
+-- Rode este bloco no SQL editor do Supabase para atualizar uma tabela `boletins`
+-- ja existente (o `create table if not exists` acima nao adiciona colunas novas).
+alter table boletins add column if not exists individuos jsonb not null default '[]'::jsonb;
+alter table boletins add column if not exists materiais jsonb not null default '[]'::jsonb;
+
+-- Migracao: chefe da equipe, usado no ranking de prisoes por policial no relatorio.
+alter table boletins add column if not exists chefe_equipe text;

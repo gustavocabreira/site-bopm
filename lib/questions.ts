@@ -4,8 +4,6 @@ export type QuestionKey =
   | "motorista"
   | "homem3"
   | "homem4"
-  | "individuoNome"
-  | "individuoRG"
   | "local"
   | "veiculo"
   | "relatoBruto";
@@ -47,18 +45,6 @@ export const QUESTIONS: Question[] = [
   {
     key: "homem4",
     label: "4° Homem Auxiliar",
-    placeholder: "Deixe em branco se não houver",
-    optional: true,
-  },
-  {
-    key: "individuoNome",
-    label: "Nome e sobrenome do indivíduo abordado",
-    placeholder: "Deixe em branco se não houver indivíduo identificado",
-    optional: true,
-  },
-  {
-    key: "individuoRG",
-    label: "RG do indivíduo",
     placeholder: "Deixe em branco se não houver",
     optional: true,
   },
