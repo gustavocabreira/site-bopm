@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic } from "./anthropicClient";
+import { CAMPOS_ESTADO_BOLETIM, type EstadoBoletim } from "./boletimEstado";
 
 const MODEL = "claude-haiku-4-5";
 
@@ -12,19 +13,6 @@ Regras obrigatórias:
 - NÃO invente fatos, nomes, locais, horários ou qualquer dado que não tenha sido citado no relato original.
 - Não adicione cabeçalhos, saudações, títulos ou comentários. Responda apenas com o corpo do texto do relato.
 - Mantenha os fatos e a ordem cronológica do relato original, apenas formalizando a linguagem.`;
-
-const SYSTEM_PROMPT_COMPLEMENTO = `Você é um assistente que revisa o RELATO DA OCORRÊNCIA de um boletim de ocorrência da Polícia Militar de São Paulo, incorporando uma informação complementar enviada pelo agente apos a primeira versao do relato.
-
-Voce recebera dois textos, nesta ordem:
-1. O RELATO ATUAL, ja formal, na terceira pessoa, no pretérito.
-2. O COMPLEMENTO, um texto informal do agente com informacao adicional, correcao ou ajuste.
-
-Regras obrigatórias:
-- Se o COMPLEMENTO adicionar um fato novo, incorpore-o no relato na posicao cronologica/logica adequada.
-- Se o COMPLEMENTO corrigir ou contradizer algo do RELATO ATUAL (ex.: "na verdade era X, nao Y"), substitua a informacao incorreta pela corrigida, sem deixar as duas versoes no texto.
-- Escreva em português formal, na terceira pessoa, no pretérito, com o mesmo linguajar policial brasileiro do relato atual.
-- NÃO invente fatos, nomes, locais, horários ou qualquer dado que não tenha sido citado em nenhum dos dois textos.
-- Não adicione cabeçalhos, saudações, títulos ou comentários. Responda apenas com o corpo do texto do relato revisado, completo (nao apenas o trecho alterado).`;
 
 const SYSTEM_PROMPT_NATUREZA = `Você é um assistente que classifica a NATUREZA DOS FATOS de uma ocorrência policial a partir do relato completo, no padrão usado em boletins de ocorrência da Polícia Militar de São Paulo.
 
@@ -56,6 +44,19 @@ Regras obrigatórias:
 - Se não for possível determinar com segurança nenhum artigo aplicável, responda exatamente com a palavra ${NENHUM}, sem mais nada.
 - Não adicione explicações, cabeçalhos, aspas ou comentários além da lista (ou da palavra ${NENHUM}).`;
 
+function mapAnthropicError(error: unknown): Error {
+  if (error instanceof Anthropic.RateLimitError) {
+    return new Error("Limite de requisicoes da API Anthropic atingido. Tente novamente em instantes.");
+  }
+  if (error instanceof Anthropic.APIConnectionError) {
+    return new Error("Falha de conexao com a API Anthropic.");
+  }
+  if (error instanceof Anthropic.APIError) {
+    return new Error(`Erro da API Anthropic (${error.status}): ${error.message}`);
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 async function chamarHaiku(systemPrompt: string, conteudoUsuario: string): Promise<string> {
   try {
     const response = await anthropic.messages.create({
@@ -71,28 +72,76 @@ async function chamarHaiku(systemPrompt: string, conteudoUsuario: string): Promi
     }
     return textBlock.text.trim();
   } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      throw new Error("Limite de requisicoes da API Anthropic atingido. Tente novamente em instantes.");
+    throw mapAnthropicError(error);
+  }
+}
+
+const NENHUM_ARTIGO_OU_MATERIAL = new Set(["", "NENHUM"]);
+
+const ATUALIZAR_BOLETIM_TOOL: Anthropic.Tool = {
+  name: "atualizar_boletim",
+  description:
+    "Retorna o estado completo do boletim de ocorrencia apos aplicar a instrucao do agente. Inclua TODOS os campos, mesmo os que nao mudaram — copie-os exatamente como estavam. Use string vazia para NATUREZA/MATERIAIS/ARTIGOS quando nao houver valor.",
+  input_schema: {
+    type: "object",
+    properties: Object.fromEntries(CAMPOS_ESTADO_BOLETIM.map((campo) => [campo, { type: "string" }])),
+    required: [...CAMPOS_ESTADO_BOLETIM],
+  },
+};
+
+const SYSTEM_PROMPT_REVISAO = `Você é um assistente que revisa boletins de ocorrência da Polícia Militar de São Paulo a partir de uma instrução do agente responsável pela ocorrência.
+
+Você recebe o ESTADO ATUAL do boletim (todos os campos, em JSON) e uma INSTRUÇÃO do agente pedindo uma correção ou complemento.
+
+Regras obrigatórias:
+- Identifique exatamente a qual(is) campo(s) a instrução se refere. Pode ser qualquer campo: dados da equipe (chefe da equipe, motorista, auxiliares, prefixo), dados do indivíduo abordado (nome, RG), local, veículo, natureza dos fatos, materiais apreendidos, artigos de lei, ou o relato da ocorrência.
+- Se a instrução disser que um campo está errado e deve ser trocado por outro valor (ex.: "o artigo está errado, deveria ser o Art. 157", "o chefe da equipe está errado, é o Fulano"), substitua diretamente o valor desse campo pelo novo, sem inventar justificativas adicionais.
+- Se a instrução adicionar um fato novo ou corrigir um fato do RELATO, incorpore isso no relato (texto formal, terceira pessoa, pretérito, linguajar policial brasileiro) na posição cronológica/lógica adequada, e ajuste NATUREZA, MATERIAIS ou ARTIGOS somente se esse fato novo realmente exigir a mudança.
+- Se a instrução mudar apenas um dado cadastral (nome de integrante da equipe, RG, prefixo, local, veículo), altere só esse campo — NÃO reescreva o relato nem os demais campos.
+- Campos que a instrução não menciona e que a mudança não afeta devem ser copiados EXATAMENTE como estavam no estado atual, sem parafrasear, resumir ou reescrever.
+- NÃO invente fatos, nomes, artigos ou dados que não tenham sido citados na instrução ou que já estivessem no estado atual.
+- Responda SEMPRE chamando a ferramenta atualizar_boletim, com todos os campos preenchidos.`;
+
+/** Revisa qualquer campo do boletim (estrutural ou gerado por IA) a partir de uma instrução livre do agente. */
+export async function revisarBoletim(estadoAtual: EstadoBoletim, instrucao: string): Promise<EstadoBoletim> {
+  const conteudoUsuario = `ESTADO ATUAL (JSON):\n${JSON.stringify(estadoAtual, null, 2)}\n\nINSTRUÇÃO DO AGENTE:\n${instrucao}`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT_REVISAO,
+      tools: [ATUALIZAR_BOLETIM_TOOL],
+      tool_choice: { type: "tool", name: "atualizar_boletim" },
+      messages: [{ role: "user", content: conteudoUsuario }],
+    });
+
+    const toolUse = response.content.find((block) => block.type === "tool_use");
+    if (!toolUse || toolUse.type !== "tool_use") {
+      throw new Error("A IA não retornou uma atualização válida do boletim.");
     }
-    if (error instanceof Anthropic.APIConnectionError) {
-      throw new Error("Falha de conexao com a API Anthropic.");
+
+    const input = toolUse.input as Record<string, unknown>;
+    const resultado = { ...estadoAtual };
+    for (const campo of CAMPOS_ESTADO_BOLETIM) {
+      const valor = input[campo];
+      if (typeof valor !== "string") continue;
+      const valorNormalizado = valor.trim();
+      if (campo === "materiaisApreendidos" || campo === "artigos") {
+        resultado[campo] = NENHUM_ARTIGO_OU_MATERIAL.has(valorNormalizado.toUpperCase()) ? null : valor;
+      } else {
+        resultado[campo] = valor;
+      }
     }
-    if (error instanceof Anthropic.APIError) {
-      throw new Error(`Erro da API Anthropic (${error.status}): ${error.message}`);
-    }
-    throw error;
+    return resultado;
+  } catch (error) {
+    throw mapAnthropicError(error);
   }
 }
 
 /** Gera o texto formal do RELATO DA OCORRÊNCIA a partir do relato bruto do agente. */
 export function gerarRelatoFormal(relatoBruto: string): Promise<string> {
   return chamarHaiku(SYSTEM_PROMPT_RELATO, relatoBruto);
-}
-
-/** Revisa o relato formal ja existente, incorporando um complemento/ajuste informal. */
-export function gerarRelatoComplementado(relatoAtual: string, complemento: string): Promise<string> {
-  const conteudoUsuario = `RELATO ATUAL:\n${relatoAtual}\n\nCOMPLEMENTO:\n${complemento}`;
-  return chamarHaiku(SYSTEM_PROMPT_COMPLEMENTO, conteudoUsuario);
 }
 
 /** Gera a frase formal da NATUREZA DOS FATOS a partir do relato completo (ja formalizado). */
@@ -157,25 +206,6 @@ export async function gerarConteudoOcorrencia(relatoBruto: string): Promise<Cont
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     avisos.push(`Não foi possível formatar o relato automaticamente (${message}). Usando o relato bruto sem formatação.`);
-  }
-
-  const derivados = await gerarCamposDerivados(relatoFinal);
-  return { relato: relatoFinal, ...derivados, avisos: [...avisos, ...derivados.avisos] };
-}
-
-/** Revisa o relato incorporando um complemento e regenera os campos derivados. */
-export async function complementarConteudoOcorrencia(
-  relatoFinalAtual: string,
-  complemento: string,
-): Promise<ConteudoOcorrencia> {
-  const avisos: string[] = [];
-  let relatoFinal = relatoFinalAtual;
-
-  try {
-    relatoFinal = await gerarRelatoComplementado(relatoFinalAtual, complemento);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    avisos.push(`Não foi possível incorporar o complemento automaticamente (${message}). Mantendo o relato anterior.`);
   }
 
   const derivados = await gerarCamposDerivados(relatoFinal);

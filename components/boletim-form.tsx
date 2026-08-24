@@ -22,6 +22,7 @@ import {
 import { QUESTIONS, CREW_KEYS, type BoletimFields, type QuestionKey } from "@/lib/questions";
 import { buildBoletim, buildBoletimTextoPuro } from "@/lib/boletimTemplate";
 import { getDataHoraAtual } from "@/lib/dateFormatter";
+import type { EstadoBoletim } from "@/lib/boletimEstado";
 
 type Phase = "collecting" | "loading" | "review";
 
@@ -130,24 +131,58 @@ export function BoletimForm() {
 
     setEnviandoComplemento(true);
     try {
+      const estadoAtual: EstadoBoletim = {
+        prefixo: fields.prefixo,
+        chefeEquipe: fields.chefeEquipe,
+        motorista: fields.motorista,
+        homem3: fields.homem3,
+        homem4: fields.homem4,
+        individuoNome: fields.individuoNome,
+        individuoRG: fields.individuoRG,
+        local: fields.local,
+        veiculo: fields.veiculo,
+        relato: conteudo.relato,
+        natureza: conteudo.natureza,
+        materiaisApreendidos: conteudo.materiaisApreendidos,
+        artigos: conteudo.artigos,
+      };
+
       const res = await fetch("/api/complementar-boletim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relatoAtual: conteudo.relato, complemento }),
+        body: JSON.stringify({ estadoAtual, instrucao: complemento }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error ?? "Erro ao atualizar o relatório.");
+        toast.error(data.error ?? "Erro ao atualizar o boletim.");
         return;
       }
 
-      setConteudo(data);
-      mostrarAvisos(data.avisos ?? []);
+      const estadoAtualizado: EstadoBoletim = data;
+      setFields((prev) => ({
+        ...prev,
+        prefixo: estadoAtualizado.prefixo,
+        chefeEquipe: estadoAtualizado.chefeEquipe,
+        motorista: estadoAtualizado.motorista,
+        homem3: estadoAtualizado.homem3,
+        homem4: estadoAtualizado.homem4,
+        individuoNome: estadoAtualizado.individuoNome,
+        individuoRG: estadoAtualizado.individuoRG,
+        local: estadoAtualizado.local,
+        veiculo: estadoAtualizado.veiculo,
+      }));
+      setConteudo({
+        relato: estadoAtualizado.relato,
+        natureza: estadoAtualizado.natureza,
+        materiaisApreendidos: estadoAtualizado.materiaisApreendidos,
+        artigos: estadoAtualizado.artigos,
+        avisos: [],
+      });
       setComplemento("");
-      toast.success("Relatório atualizado.");
+      toast.success("Boletim atualizado.");
     } catch {
-      toast.error("Falha de conexão ao atualizar o relatório.");
+      toast.error("Falha de conexão ao atualizar o boletim.");
     } finally {
       setEnviandoComplemento(false);
     }
@@ -325,10 +360,10 @@ export function BoletimForm() {
             <CardContent className="flex flex-col gap-4">
               {!publicado && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="complemento">Adicionar informação complementar ou correção</Label>
+                  <Label htmlFor="complemento">Adicionar informação, corrigir ou trocar qualquer campo</Label>
                   <Textarea
                     id="complemento"
-                    placeholder="Ex.: esqueci de mencionar que também foi apreendida uma balança de precisão"
+                    placeholder="Ex.: o artigo 155 está errado, deveria ser o 157 / o chefe da equipe está errado, é o Fulano / esqueci de mencionar que também foi apreendida uma balança de precisão"
                     value={complemento}
                     onChange={(e) => setComplemento(e.target.value)}
                     rows={4}
@@ -340,7 +375,7 @@ export function BoletimForm() {
                     disabled={enviandoComplemento || !complemento.trim()}
                     className="self-start"
                   >
-                    {enviandoComplemento ? "Atualizando..." : "Atualizar relatório"}
+                    {enviandoComplemento ? "Atualizando..." : "Atualizar boletim"}
                   </Button>
                 </div>
               )}

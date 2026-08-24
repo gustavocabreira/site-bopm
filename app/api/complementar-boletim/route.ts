@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { complementarConteudoOcorrencia } from "@/lib/relatoGenerator";
+import { revisarBoletim } from "@/lib/relatoGenerator";
+import type { EstadoBoletim } from "@/lib/boletimEstado";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -10,16 +11,16 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const relatoAtual: string | undefined = body?.relatoAtual;
-  const complemento: string | undefined = body?.complemento;
+  const estadoAtual: EstadoBoletim | undefined = body?.estadoAtual;
+  const instrucao: string | undefined = body?.instrucao;
 
-  if (!relatoAtual || !complemento || !complemento.trim()) {
-    return NextResponse.json({ error: "Relato atual e complemento são obrigatórios." }, { status: 400 });
+  if (!estadoAtual || !instrucao || !instrucao.trim()) {
+    return NextResponse.json({ error: "Estado atual e instrução são obrigatórios." }, { status: 400 });
   }
 
   try {
-    const conteudo = await complementarConteudoOcorrencia(relatoAtual, complemento);
-    return NextResponse.json(conteudo);
+    const estadoAtualizado = await revisarBoletim(estadoAtual, instrucao);
+    return NextResponse.json(estadoAtualizado);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.json({ error: message }, { status: 502 });
