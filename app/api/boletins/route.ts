@@ -20,23 +20,52 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { prefixo, chefeEquipe, local, natureza, texto, individuos, materiais } = body ?? {};
+  const {
+    prefixo,
+    chefeEquipe,
+    motorista,
+    homem3,
+    homem4,
+    local,
+    veiculo,
+    natureza,
+    relato,
+    artigos,
+    data,
+    horario,
+    texto,
+    individuos,
+    materiais,
+  } = body ?? {};
 
-  if (!prefixo || !local || !natureza || !texto) {
+  if (!prefixo || !local || !natureza || !texto || !relato || !data || !horario) {
     return NextResponse.json({ error: "Dados incompletos para salvar o boletim." }, { status: 400 });
   }
 
-  await saveBoletim({
-    discordUserId: session.user.id,
-    discordUserName: session.user.name ?? null,
-    prefixo,
-    chefeEquipe: chefeEquipe ?? "",
-    local,
-    natureza,
-    texto,
-    individuos: Array.isArray(individuos) ? individuos : [],
-    materiais: Array.isArray(materiais) ? materiais : [],
-  });
+  try {
+    await saveBoletim({
+      discordUserId: session.user.id,
+      discordUserName: session.user.name ?? null,
+      prefixo,
+      chefeEquipe: chefeEquipe ?? "",
+      motorista: motorista ?? "",
+      homem3: homem3 ?? "",
+      homem4: homem4 ?? "",
+      local,
+      veiculo: veiculo ?? "",
+      natureza,
+      relato,
+      artigos: artigos ?? null,
+      data,
+      horario,
+      texto,
+      individuos: Array.isArray(individuos) ? individuos : [],
+      materiais: Array.isArray(materiais) ? materiais : [],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro desconhecido";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -25,9 +25,11 @@ Regras obrigatórias:
 
 const NENHUM = "NENHUM";
 
+/** Formato do campo ARTIGOS, compartilhado entre a geração inicial e a revisão para o resultado nunca sair com um padrão diferente (ex.: tudo numa linha, separado por "; " ou ","). */
+const FORMATO_ARTIGOS = `- O campo de artigos deve conter SEMPRE um artigo por linha (quebra de linha real, "\\n"), sem marcadores, travessões, ponto e vírgula ou vírgula separando os artigos, e sem nome popular do crime — apenas no formato "Art. X do(a) [lei/código]" (ex.: "Art. 155 do Código Penal", "Art. 289 do Código Penal", "Art. 33 da Lei 11.343/06"). Nunca junte dois artigos na mesma linha nem troque "do"/"da" por vírgula.`;
+
 /** Regras de tipificação penal compartilhadas entre a geração inicial dos ARTIGOS e a revisão via IA — mantidas em um único lugar para não divergirem. */
 const REGRAS_TIPIFICACAO_ARTIGOS = `- Sempre que houver menção a "dinheiro sujo" (valores em espécie associados a atividade ilícita), inclua também o Art. 289 do Código Penal na lista de artigos.
-- Em casos envolvendo subtração de caixa eletrônico, a classificação entre furto e roubo depende EXCLUSIVAMENTE de ter havido ou não apreensão/emprego de arma (de fogo ou branca), independentemente do termo usado no relato ou na instrução do agente: se houve arma, use o Art. 157 do Código Penal (nunca o 155); se não houve arma, use o Art. 155 do Código Penal (nunca o 157). Isso vale mesmo que a arma só tenha sido mencionada depois, em uma correção — se a instrução informar que houve apreensão de arma em uma ocorrência de caixa eletrônico já classificada como furto (Art. 155), troque para roubo (Art. 157).
 - Sempre que houver apreensão de arma de fogo (ex.: pistola, revólver) mencionada no relato ou em uma instrução de revisão, inclua também o Art. 12 da Lei 10.826/03 (posse/porte de arma de fogo) na lista de artigos, além de qualquer outro artigo aplicável aos demais fatos.
 - Sempre que houver apreensão de munição, inclua também um artigo referente à quantidade apreendida: até 50 (cinquenta) unidades, use o Art. 17 da Lei 10.826/03; acima de 50 (cinquenta) unidades, use o Art. 17, §1º, da Lei 10.826/03 (em vez do Art. 17 simples). Se a quantidade de munição mudar numa revisão (ex.: de 30 para 80), atualize esse artigo de acordo com a nova quantidade.`;
 
@@ -35,7 +37,7 @@ const SYSTEM_PROMPT_ARTIGOS = `Você é um assistente que identifica os ARTIGOS 
 
 Regras obrigatórias:
 - Leia o relato e identifique o(s) artigo(s) de lei penal brasileira que se aplicam de forma CLARA E INEQUÍVOCA aos fatos descritos.
-- Responda com uma lista, um artigo por linha, sem marcadores, travessões ou nome popular do crime, apenas no formato "Art. X do(a) [lei/código]" (ex.: "Art. 155 do Código Penal", "Art. 289 do Código Penal", "Art. 33 da Lei 11.343/06").
+${FORMATO_ARTIGOS}
 - NÃO invente, suponha ou arrisque uma tipificação penal quando os fatos do relato forem insuficientes ou ambíguos para determiná-la com segurança.
 ${REGRAS_TIPIFICACAO_ARTIGOS}
 - Se não for possível determinar com segurança nenhum artigo aplicável, responda exatamente com a palavra ${NENHUM}, sem mais nada.
@@ -83,11 +85,21 @@ export function gerarNaturezaFormal(relatoCompleto: string): Promise<string> {
   return chamarHaiku(SYSTEM_PROMPT_NATUREZA, relatoCompleto);
 }
 
+/** Garante um artigo por linha mesmo se o modelo colar mais de um na mesma linha (ex.: separados por "; " ou ","). */
+function normalizarArtigos(texto: string): string {
+  return texto
+    .split("\n")
+    .flatMap((linha) => linha.split(/;\s*|,\s*(?=Art\.)/i))
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .join("\n");
+}
+
 /** Identifica os ARTIGOS de lei penal aplicaveis. Retorna null se nao for possivel determinar. */
 export async function gerarArtigos(relatoCompleto: string): Promise<string | null> {
   const resposta = await chamarHaiku(SYSTEM_PROMPT_ARTIGOS, relatoCompleto);
   if (resposta.trim().toUpperCase() === NENHUM) return null;
-  return resposta;
+  return normalizarArtigos(resposta);
 }
 
 const MATERIAL_ITEM_SCHEMA = {
@@ -252,6 +264,8 @@ Regras obrigatórias:
 - Ao corrigir um item de uma lista (individuos ou materiaisApreendidos), altere apenas o item indicado e mantenha os demais itens da lista intactos, na mesma ordem. Para adicionar um item novo à lista, acrescente-o mantendo os existentes; para remover, exclua apenas o indicado.
 - Se a instrução adicionar um fato novo ou corrigir um fato do RELATO, incorpore isso no relato (texto formal, terceira pessoa, pretérito, linguajar policial brasileiro) na posição cronológica/lógica adequada, e ajuste NATUREZA, MATERIAIS ou ARTIGOS sempre que esse fato novo exigir a mudança — inclusive quando o fato novo alterar a tipificação penal já definida antes, mesmo sem a instrução pedir isso explicitamente. Regras de tipificação que sempre se aplicam, na geração inicial e em toda revisão:
 ${REGRAS_TIPIFICACAO_ARTIGOS}
+- Ao devolver o campo de artigos (seja ele alterado ou copiado sem mudança), siga sempre este formato:
+${FORMATO_ARTIGOS}
 - Se a instrução mudar apenas um dado cadastral (nome de integrante da equipe, RG, prefixo, local, veículo), altere só esse campo — NÃO reescreva o relato nem os demais campos.
 - Campos e itens de lista que a instrução não menciona e que a mudança não afeta devem ser copiados EXATAMENTE como estavam no estado atual, sem parafrasear, resumir ou reescrever.
 - NÃO invente fatos, nomes, artigos ou dados que não tenham sido citados na instrução ou que já estivessem no estado atual.
@@ -292,7 +306,7 @@ export async function revisarBoletim(estadoAtual: EstadoBoletim, instrucao: stri
       const valor = input[campo];
       if (typeof valor !== "string") continue;
       if (campo === "artigos") {
-        resultado.artigos = valor.trim().toUpperCase() === NENHUM ? null : valor;
+        resultado.artigos = valor.trim().toUpperCase() === NENHUM ? null : normalizarArtigos(valor);
       } else {
         resultado[campo] = valor;
       }

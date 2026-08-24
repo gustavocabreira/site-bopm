@@ -13,7 +13,7 @@ interface MaterialAgregado {
 }
 
 interface RankingPolicial {
-  chefeEquipe: string;
+  policial: string;
   totalPresos: number;
   totalBoletins: number;
 }
@@ -74,27 +74,45 @@ export async function GET(request: Request) {
     a.categoria === b.categoria ? b.quantidadeTotal - a.quantidadeTotal : a.categoria.localeCompare(b.categoria),
   );
 
-  const rankingPorChefe = new Map<string, RankingPolicial>();
+  const rankingPorPolicial = new Map<string, RankingPolicial>();
   for (const boletim of boletins) {
-    const chefeEquipe = boletim.chefeEquipe?.trim();
-    if (!chefeEquipe) continue;
-
-    const atual = rankingPorChefe.get(chefeEquipe);
     const presosNesteBoletim = boletim.individuos.filter((individuo) => individuo.nome.trim().length > 0).length;
-    if (atual) {
-      atual.totalPresos += presosNesteBoletim;
-      atual.totalBoletins += 1;
-    } else {
-      rankingPorChefe.set(chefeEquipe, { chefeEquipe, totalPresos: presosNesteBoletim, totalBoletins: 1 });
+
+    const integrantes = new Set(
+      [boletim.chefeEquipe, boletim.motorista, boletim.homem3, boletim.homem4]
+        .map((nome) => nome?.trim())
+        .filter((nome): nome is string => Boolean(nome)),
+    );
+
+    for (const policial of integrantes) {
+      const atual = rankingPorPolicial.get(policial);
+      if (atual) {
+        atual.totalPresos += presosNesteBoletim;
+        atual.totalBoletins += 1;
+      } else {
+        rankingPorPolicial.set(policial, { policial, totalPresos: presosNesteBoletim, totalBoletins: 1 });
+      }
     }
   }
 
-  const rankingPrisoes = [...rankingPorChefe.values()].sort((a, b) => b.totalPresos - a.totalPresos);
+  const rankingPrisoes = [...rankingPorPolicial.values()].sort((a, b) => b.totalPresos - a.totalPresos);
+
+  const ocorrenciasPorCategoria = new Map<string, number>();
+  for (const boletim of boletins) {
+    for (const material of boletim.materiais) {
+      ocorrenciasPorCategoria.set(material.categoria, (ocorrenciasPorCategoria.get(material.categoria) ?? 0) + 1);
+    }
+  }
+  const categoriasOrdenadas = [...ocorrenciasPorCategoria.entries()].sort((a, b) => b[1] - a[1]);
+  const top3Categorias = categoriasOrdenadas.slice(0, 3).map(([categoria, total]) => ({ categoria, total }));
+  const restante = categoriasOrdenadas.slice(3).reduce((soma, [, total]) => soma + total, 0);
+  const topCategorias = restante > 0 ? [...top3Categorias, { categoria: "Outros", total: restante }] : top3Categorias;
 
   return NextResponse.json({
     totalBoletins: boletins.length,
     individuos,
     materiaisAgregados,
     rankingPrisoes,
+    topCategorias,
   });
 }

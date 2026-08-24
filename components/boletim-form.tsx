@@ -228,8 +228,20 @@ export function BoletimForm() {
       artigos: conteudo.artigos,
     });
 
-    await Promise.all([
-      fetch("/api/crew", {
+    fetch("/api/crew", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prefixo: fields.prefixo,
+        chefeEquipe: fields.chefeEquipe,
+        motorista: fields.motorista,
+        homem3: fields.homem3,
+        homem4: fields.homem4,
+      }),
+    }).catch(() => {});
+
+    try {
+      const res = await fetch("/api/boletins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -238,22 +250,29 @@ export function BoletimForm() {
           motorista: fields.motorista,
           homem3: fields.homem3,
           homem4: fields.homem4,
-        }),
-      }).catch(() => {}),
-      fetch("/api/boletins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prefixo: fields.prefixo,
-          chefeEquipe: fields.chefeEquipe,
           local: fields.local,
+          veiculo: fields.veiculo,
           natureza: conteudo.natureza,
+          relato: conteudo.relato,
+          artigos: conteudo.artigos,
+          data: dataHora.data,
+          horario: dataHora.horario,
           texto,
           individuos: individuosParaSalvar,
           materiais: conteudo.materiaisApreendidos,
         }),
-      }).catch(() => {}),
-    ]);
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error ?? "Erro ao salvar o boletim. Ele NÃO foi confirmado — tente novamente.");
+        setConfirmOpen(false);
+        return;
+      }
+    } catch {
+      toast.error("Falha de conexão ao salvar o boletim. Ele NÃO foi confirmado — tente novamente.");
+      return;
+    }
 
     setPublicado(true);
     toast.success("Boletim confirmado.");
