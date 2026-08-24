@@ -17,6 +17,7 @@ function DiscordIcon() {
 
 const ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: "Seu usuário do Discord não tem permissão para acessar este sistema.",
+  GuildAccessRevoked: "Você não é mais membro do servidor Discord autorizado. Faça login novamente.",
   Default: "Não foi possível entrar. Tente novamente.",
 };
 

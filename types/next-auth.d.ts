@@ -7,3 +7,12 @@ declare module "next-auth" {
     } & DefaultSession["user"];
   }
 }
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    discordId?: string;
+    nickname?: string;
+    accessToken?: string;
+    guildCheckedAt?: number;
+  }
+}

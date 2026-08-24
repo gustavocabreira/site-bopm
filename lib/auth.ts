@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
 
-const REQUIRED_GUILD_ID = "1477840333021778040";
+export const REQUIRED_GUILD_ID = "1477840333021778040";
 
 interface DiscordGuildMember {
   nick?: string | null;
@@ -18,6 +18,10 @@ async function fetchGuildMember(accessToken: string): Promise<DiscordGuildMember
   } catch {
     return null;
   }
+}
+
+export async function isGuildMember(accessToken: string): Promise<boolean> {
+  return (await fetchGuildMember(accessToken)) !== null;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -43,6 +47,8 @@ export const authOptions: NextAuthOptions = {
         const member = await fetchGuildMember(account.access_token);
         const nickname = member?.nick ?? member?.user?.global_name ?? member?.user?.username ?? null;
         if (nickname) token.nickname = nickname;
+        token.accessToken = account.access_token;
+        token.guildCheckedAt = Date.now();
       }
       return token;
     },
