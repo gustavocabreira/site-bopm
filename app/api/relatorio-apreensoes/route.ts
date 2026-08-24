@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { listBoletinsByPeriod } from "@/lib/boletimStore";
+import { listBoletinsByPeriod, type BoletimSalvo } from "@/lib/boletimStore";
 
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,6 +18,12 @@ interface RankingPolicial {
   totalBoletins: number;
 }
 
+function integrantesDoBoletim(boletim: BoletimSalvo): string[] {
+  return [boletim.chefeEquipe, boletim.motorista, boletim.homem3, boletim.homem4]
+    .map((nome) => nome?.trim())
+    .filter((nome): nome is string => Boolean(nome));
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -27,6 +33,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
+  const policialFiltro = searchParams.get("policial")?.trim() || null;
 
   if (!from || !to || !DATA_REGEX.test(from) || !DATA_REGEX.test(to)) {
     return NextResponse.json({ error: "Informe as datas de início e fim no formato AAAA-MM-DD." }, { status: 400 });
@@ -36,7 +43,15 @@ export async function GET(request: Request) {
   const fromISO = `${from}T00:00:00-03:00`;
   const toISO = `${to}T23:59:59-03:00`;
 
-  const boletins = await listBoletinsByPeriod(fromISO, toISO);
+  const boletinsPeriodo = await listBoletinsByPeriod(fromISO, toISO);
+
+  const todosPoliciais = [...new Set(boletinsPeriodo.flatMap(integrantesDoBoletim))].sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
+  );
+
+  const boletins = policialFiltro
+    ? boletinsPeriodo.filter((boletim) => integrantesDoBoletim(boletim).includes(policialFiltro))
+    : boletinsPeriodo;
 
   const individuos = boletins.flatMap((boletim) =>
     boletim.individuos
@@ -78,13 +93,7 @@ export async function GET(request: Request) {
   for (const boletim of boletins) {
     const presosNesteBoletim = boletim.individuos.filter((individuo) => individuo.nome.trim().length > 0).length;
 
-    const integrantes = new Set(
-      [boletim.chefeEquipe, boletim.motorista, boletim.homem3, boletim.homem4]
-        .map((nome) => nome?.trim())
-        .filter((nome): nome is string => Boolean(nome)),
-    );
-
-    for (const policial of integrantes) {
+    for (const policial of new Set(integrantesDoBoletim(boletim))) {
       const atual = rankingPorPolicial.get(policial);
       if (atual) {
         atual.totalPresos += presosNesteBoletim;
@@ -114,5 +123,6 @@ export async function GET(request: Request) {
     materiaisAgregados,
     rankingPrisoes,
     topCategorias,
+    todosPoliciais,
   });
 }

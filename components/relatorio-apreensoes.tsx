@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TopMateriaisChart } from "@/components/top-materiais-chart";
+import { DateRangePicker } from "@/components/date-range-picker";
+
+const TODOS_POLICIAIS = "todos";
 
 interface IndividuoRelatorio {
   nome: string;
@@ -41,16 +45,13 @@ interface Resultado {
   materiaisAgregados: MaterialAgregado[];
   rankingPrisoes: RankingPolicial[];
   topCategorias: CategoriaTotal[];
+  todosPoliciais: string[];
 }
 
-function hojeISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function diasAtrasISO(dias: number) {
+function diasAtras(dias: number) {
   const data = new Date();
-  data.setUTCDate(data.getUTCDate() - dias);
-  return data.toISOString().slice(0, 10);
+  data.setDate(data.getDate() - dias);
+  return data;
 }
 
 function formatarQuantidade(material: MaterialAgregado) {
@@ -68,8 +69,9 @@ function formatarData(iso: string) {
 }
 
 export function RelatorioApreensoes() {
-  const [from, setFrom] = useState(diasAtrasISO(15));
-  const [to, setTo] = useState(hojeISO());
+  const [from, setFrom] = useState(diasAtras(15));
+  const [to, setTo] = useState(new Date());
+  const [policial, setPolicial] = useState(TODOS_POLICIAIS);
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
@@ -78,19 +80,25 @@ export function RelatorioApreensoes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function gerarRelatorio() {
-    if (!from || !to) {
-      toast.error("Informe o período completo.");
-      return;
-    }
-    if (from > to) {
+  async function gerarRelatorio(overrides?: { policial?: string; from?: Date; to?: Date }) {
+    const policialAtivo = overrides?.policial ?? policial;
+    const fromAtivo = overrides?.from ?? from;
+    const toAtivo = overrides?.to ?? to;
+
+    if (fromAtivo > toAtivo) {
       toast.error("A data inicial deve ser anterior à data final.");
       return;
     }
 
     setCarregando(true);
     try {
-      const res = await fetch(`/api/relatorio-apreensoes?from=${from}&to=${to}`);
+      const params = new URLSearchParams({
+        from: format(fromAtivo, "yyyy-MM-dd"),
+        to: format(toAtivo, "yyyy-MM-dd"),
+      });
+      if (policialAtivo !== TODOS_POLICIAIS) params.set("policial", policialAtivo);
+
+      const res = await fetch(`/api/relatorio-apreensoes?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -106,22 +114,46 @@ export function RelatorioApreensoes() {
     }
   }
 
+  function onPeriodoChange(range: { from: Date; to: Date }) {
+    setFrom(range.from);
+    setTo(range.to);
+    gerarRelatorio({ from: range.from, to: range.to });
+  }
+
+  function onPolicialChange(value: string | null) {
+    const novoValor = value ?? TODOS_POLICIAIS;
+    setPolicial(novoValor);
+    gerarRelatorio({ policial: novoValor });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="border-border/60 shadow-sm">
         <CardHeader>
-          <CardTitle>Período</CardTitle>
+          <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="from">De</Label>
-            <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Label>Período</Label>
+            <DateRangePicker from={from} to={to} onChange={onPeriodoChange} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="to">Até</Label>
-            <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Label>Policial</Label>
+            <Select value={policial} onValueChange={onPolicialChange}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS_POLICIAIS}>Todos</SelectItem>
+                {(resultado?.todosPoliciais ?? []).map((nome) => (
+                  <SelectItem key={nome} value={nome}>
+                    {nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Button onClick={gerarRelatorio} disabled={carregando}>
+          <Button onClick={() => gerarRelatorio()} disabled={carregando}>
             {carregando ? "Gerando..." : "Gerar relatório"}
           </Button>
         </CardContent>
