@@ -130,7 +130,7 @@ const SYSTEM_PROMPT_MATERIAIS = `Você é um assistente que extrai a lista de MA
 
 Regras obrigatórias:
 - Leia o relato e identifique apenas objetos, substâncias ou valores explicitamente descritos como apreendidos, recolhidos ou arrecadados pela equipe.
-- Para cada item, classifique a CATEGORIA em uma das opções: ${CATEGORIAS_MATERIAL.join(", ")}. Use "Outro" apenas quando nenhuma categoria específica se aplicar.
+- Para cada item, classifique a CATEGORIA em uma das opções: ${CATEGORIAS_MATERIAL.join(", ")}. Use "Outro" apenas quando nenhuma categoria específica se aplicar. Para entorpecentes/inalantes, use a categoria do tipo específico da substância (ex.: "maconha" → Maconha, "cocaína"/"pó branco análogo a cocaína" → Cocaína, "crack"/"pedra" → Crack, "lança-perfume"/"loló" → Lança-perfume, "LSD"/"selo" → LSD, "ecstasy"/"MDMA" → Ecstasy, "haxixe" → Haxixe, "skunk" → Skunk); use "Outra droga" apenas se for droga mas o tipo não estiver claro ou não se encaixar nessas opções. "Mesa de drogas" é exclusiva para a mesa/bancada usada no fracionamento de entorpecentes — nunca classifique esse item como droga. Outros apetrechos de tráfico (balança de precisão, embalagens, pinos, sacolés) entram em "Outro".
 - Informe a QUANTIDADE como um número (ex.: 1, 2, 0.5) e a UNIDADE em uma das opções: ${UNIDADES_MATERIAL.join(", ")}. Para itens contados (armas, veículos, documentos), use "unidade(s)" com o número de itens.
 - A DESCRIÇÃO deve ser curta e formal, sem repetir a categoria/quantidade (ex.: "Revólver calibre 38", "Porção de substância análoga a cocaína", "Em espécie, oriundo de atividade ilícita").
 - NÃO invente itens, quantidades ou descrições que não estejam no relato.
