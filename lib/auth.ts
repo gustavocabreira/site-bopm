@@ -15,20 +15,33 @@ interface DiscordGuildMember {
   user?: { global_name?: string | null; username?: string | null };
 }
 
-async function fetchGuildMember(accessToken: string): Promise<DiscordGuildMember | null> {
+/**
+ * `null` distingue duas coisas: a conta confirmadamente não está na guilda
+ * (Discord respondeu 403/404 — cai pro fluxo de "sem acesso"), ou não deu
+ * pra confirmar nada (timeout, erro de rede, 5xx/429 da API do Discord —
+ * nesse caso falha "aberta": não desloga a pessoa por um problema de rede
+ * passageiro). Só o segundo caso usa `indeterminado`.
+ */
+async function fetchGuildMember(
+  accessToken: string,
+): Promise<{ membro: DiscordGuildMember | null; indeterminado: boolean }> {
   try {
     const res = await fetch(`https://discord.com/api/users/@me/guilds/${REQUIRED_GUILD_ID}/member`, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return null;
-    return await res.json();
+    if (res.status === 403 || res.status === 404) return { membro: null, indeterminado: false };
+    if (!res.ok) return { membro: null, indeterminado: true };
+    return { membro: await res.json(), indeterminado: false };
   } catch {
-    return null;
+    return { membro: null, indeterminado: true };
   }
 }
 
+/** Verdadeiro se confirmadamente é membro, ou se não deu pra confirmar (falha de rede não desloga ninguém). */
 export async function isGuildMember(accessToken: string): Promise<boolean> {
-  return (await fetchGuildMember(accessToken)) !== null;
+  const { membro, indeterminado } = await fetchGuildMember(accessToken);
+  return membro !== null || indeterminado;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -43,16 +56,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ account }) {
       if (!account?.access_token) return false;
-      const member = await fetchGuildMember(account.access_token);
-      return member !== null;
+      const { membro } = await fetchGuildMember(account.access_token);
+      return membro !== null;
     },
     async jwt({ token, profile, account }) {
       if (profile && "id" in profile) {
         token.discordId = profile.id as string;
       }
       if (account?.access_token) {
-        const member = await fetchGuildMember(account.access_token);
-        const nickname = member?.nick ?? member?.user?.global_name ?? member?.user?.username ?? null;
+        const { membro } = await fetchGuildMember(account.access_token);
+        const nickname = membro?.nick ?? membro?.user?.global_name ?? membro?.user?.username ?? null;
         if (nickname) token.nickname = nickname;
         token.accessToken = account.access_token;
         token.guildCheckedAt = Date.now();
