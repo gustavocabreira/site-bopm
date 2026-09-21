@@ -22,11 +22,7 @@ const LINKS = [
 const LINK_ADMIN = { href: "/admin/turnos", label: "Supervisão de turnos", icon: Users2 };
 
 function Logo({ className }: { className?: string }) {
-  return (
-    <div className={cn("flex items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/25", className)}>
-      <ShieldCheck className="size-4.5" strokeWidth={1.75} />
-    </div>
-  );
+  return <img src="/choque2.png" alt="2º Batalhão de Choque - Anchieta" className={cn("object-contain", className)} />;
 }
 
 function NavLinks({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: () => void }) {
