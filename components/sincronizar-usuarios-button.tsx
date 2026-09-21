@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { notificarMembrosSincronizados } from "@/lib/membrosSyncEvent";
 
 export function SincronizarUsuariosButton() {
   const [sincronizando, setSincronizando] = useState(false);
@@ -20,6 +21,7 @@ export function SincronizarUsuariosButton() {
       }
 
       toast.success(`Usuários sincronizados: ${data.comCargo} de ${data.total}.`);
+      notificarMembrosSincronizados();
     } catch {
       toast.error("Falha de conexão ao sincronizar usuários.");
     } finally {

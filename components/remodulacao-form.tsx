@@ -9,6 +9,7 @@ import { GuarnicaoRsoFields } from "@/components/guarnicao-rso-fields";
 import type { CrewSnapshot, TipoViatura } from "@/lib/rsoEstado";
 import type { MembroGuilda } from "@/lib/membroGuilda";
 import { resumoRemodulacoes } from "@/lib/rsoTemplate";
+import { MEMBROS_SINCRONIZADOS_EVENT } from "@/lib/membrosSyncEvent";
 
 export function RemodulacaoForm({
   rsoId,
@@ -29,12 +30,17 @@ export function RemodulacaoForm({
   const [membros, setMembros] = useState<MembroGuilda[]>([]);
 
   useEffect(() => {
-    fetch("/api/discord/membros")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.membros)) setMembros(data.membros);
-      })
-      .catch(() => {});
+    function carregarMembros() {
+      fetch("/api/discord/membros")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.membros)) setMembros(data.membros);
+        })
+        .catch(() => {});
+    }
+    carregarMembros();
+    window.addEventListener(MEMBROS_SINCRONIZADOS_EVENT, carregarMembros);
+    return () => window.removeEventListener(MEMBROS_SINCRONIZADOS_EVENT, carregarMembros);
   }, []);
 
   function updateField(campo: keyof CrewSnapshot, valor: string) {

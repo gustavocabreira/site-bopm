@@ -7,8 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GuarnicaoRsoFields } from "@/components/guarnicao-rso-fields";
-import type { CrewSnapshot, TipoViatura } from "@/lib/rsoEstado";
+import { PREFIXOS_VIATURA, type CrewSnapshot, type TipoViatura } from "@/lib/rsoEstado";
 
 type FormularioRso = CrewSnapshot & {
   turno: string;
@@ -115,7 +122,7 @@ export function AbrirRsoForm() {
             </Label>
             <Input
               id="turno"
-              placeholder="Ex.: 07:00 às 19:00"
+              placeholder="Ex.: 07:00"
               value={form.turno}
               onChange={(e) => updateField("turno", e.target.value)}
             />
@@ -135,12 +142,30 @@ export function AbrirRsoForm() {
             <Label htmlFor="prefixo">
               Prefixo <span className="text-primary">*</span>
             </Label>
-            <Input
-              id="prefixo"
-              placeholder="Ex.: M-92"
-              value={form.prefixo}
-              onChange={(e) => updateField("prefixo", e.target.value)}
-            />
+            {tipo === "quatro_rodas" ? (
+              <Select
+                value={form.prefixo}
+                onValueChange={(value) => value && updateField("prefixo", value)}
+              >
+                <SelectTrigger id="prefixo" className="w-full">
+                  <SelectValue placeholder="Selecione o prefixo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PREFIXOS_VIATURA.map((prefixo) => (
+                    <SelectItem key={prefixo} value={prefixo}>
+                      {prefixo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="prefixo"
+                placeholder="Ex.: M-92"
+                value={form.prefixo}
+                onChange={(e) => updateField("prefixo", e.target.value)}
+              />
+            )}
           </div>
         </div>
 

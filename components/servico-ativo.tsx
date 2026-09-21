@@ -16,6 +16,7 @@ import type { CrewSnapshot, Remodulacao } from "@/lib/rsoEstado";
 import type { BoletimSalvo } from "@/lib/boletimStore";
 import type { RsoSalvo } from "@/lib/rsoStore";
 import type { MembroGuilda } from "@/lib/membroGuilda";
+import { MEMBROS_SINCRONIZADOS_EVENT } from "@/lib/membrosSyncEvent";
 
 type Tela = "widgets" | "novo-bopm" | "remodulacao" | "fechar";
 
@@ -76,12 +77,17 @@ export function ServicoAtivo({
   }, []);
 
   useEffect(() => {
-    fetch("/api/discord/membros")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.membros)) setMembros(data.membros);
-      })
-      .catch(() => {});
+    function carregarMembros() {
+      fetch("/api/discord/membros")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.membros)) setMembros(data.membros);
+        })
+        .catch(() => {});
+    }
+    carregarMembros();
+    window.addEventListener(MEMBROS_SINCRONIZADOS_EVENT, carregarMembros);
+    return () => window.removeEventListener(MEMBROS_SINCRONIZADOS_EVENT, carregarMembros);
   }, []);
 
   /**

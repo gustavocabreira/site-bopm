@@ -1,5 +1,19 @@
 export type TipoViatura = "quatro_rodas" | "rocam";
 
+/** Prefixos das viaturas 4 rodas da frota — ROCAM não tem frota fixa, então segue como texto livre. */
+export const PREFIXOS_VIATURA = [
+  "M-92000",
+  "M-92001",
+  "M-92002",
+  "M-92100",
+  "M-92200",
+  "M-92140",
+  "M-92115",
+  "M-92213",
+  "M-92219",
+  "M-92424",
+] as const;
+
 export interface EstadoRso {
   tipo: TipoViatura;
   data: string;

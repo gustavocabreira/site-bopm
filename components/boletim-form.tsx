@@ -8,6 +8,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,7 +33,7 @@ import { getDataHoraAtual } from "@/lib/dateFormatter";
 import { MembroCombobox } from "@/components/membro-combobox";
 import type { EstadoBoletim, Individuo } from "@/lib/boletimEstado";
 import type { MaterialApreendido } from "@/lib/materiais";
-import type { TipoViatura } from "@/lib/rsoEstado";
+import { PREFIXOS_VIATURA, type TipoViatura } from "@/lib/rsoEstado";
 import type { MembroGuilda } from "@/lib/membroGuilda";
 
 /** Campos de equipe selecionados pelo MembroCombobox (guardam ID da conta do Discord), não digitados livremente. */
@@ -421,6 +428,22 @@ export function BoletimForm({ rso, onPublicado }: BoletimFormProps = {}) {
                               onChange={(valor) => updateField(question.key, valor)}
                               membros={membros}
                             />
+                          ) : question.key === "prefixo" && tipo === "quatro_rodas" ? (
+                            <Select
+                              value={fields.prefixo}
+                              onValueChange={(value) => value && updateField("prefixo", value)}
+                            >
+                              <SelectTrigger id={question.key} className="w-full">
+                                <SelectValue placeholder="Selecione o prefixo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PREFIXOS_VIATURA.map((prefixo) => (
+                                  <SelectItem key={prefixo} value={prefixo}>
+                                    {prefixo}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           ) : (
                             <Input
                               id={question.key}
