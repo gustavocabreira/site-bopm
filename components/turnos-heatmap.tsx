@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/date-range-picker";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { MatrizHeatmapTurnos } from "@/lib/turnosHeatmap";
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -95,29 +96,45 @@ export function TurnosHeatmap() {
               <CardTitle>Turnos em serviço por dia e horário</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <div className="overflow-x-auto">
-                <div className="inline-flex flex-col gap-1">
-                  <div className="flex gap-1 pl-12">
-                    {HORAS.map((hora) => (
-                      <div key={hora} className="w-6 shrink-0 text-center text-[10px] text-muted-foreground">
-                        {hora % 3 === 0 ? hora : ""}
+              <div className="overflow-x-auto pb-1">
+                <TooltipProvider delay={80} closeDelay={0}>
+                  <div className="inline-flex flex-col gap-1">
+                    <div className="flex gap-1 pl-12">
+                      {HORAS.map((hora) => (
+                        <div key={hora} className="w-6 shrink-0 text-center text-[10px] text-muted-foreground">
+                          {hora % 3 === 0 ? hora : ""}
+                        </div>
+                      ))}
+                    </div>
+                    {matriz!.map((linha, diaSemana) => (
+                      <div key={diaSemana} className="flex items-center gap-1">
+                        <div className="w-11 shrink-0 text-xs text-muted-foreground">{DIAS[diaSemana]}</div>
+                        {linha.map((valor, hora) => (
+                          <Tooltip key={hora}>
+                            <TooltipTrigger
+                              render={
+                                <div
+                                  className="relative size-6 shrink-0 rounded-sm bg-muted/40 transition-transform duration-150 ease-out hover:z-10 hover:scale-125 hover:ring-2 hover:ring-foreground/60 hover:ring-offset-2 hover:ring-offset-background focus-visible:z-10 focus-visible:scale-125 focus-visible:ring-2 focus-visible:ring-foreground/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                                  style={valor > 0 ? { backgroundColor: corDaCelula(valor, max) } : undefined}
+                                />
+                              }
+                            />
+                            <TooltipContent side="top">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-sm font-semibold tabular-nums">
+                                  {valor} {valor === 1 ? "turno" : "turnos"}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {DIAS[diaSemana]} às {String(hora).padStart(2, "0")}h
+                                </span>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
                       </div>
                     ))}
                   </div>
-                  {matriz!.map((linha, diaSemana) => (
-                    <div key={diaSemana} className="flex items-center gap-1">
-                      <div className="w-11 shrink-0 text-xs text-muted-foreground">{DIAS[diaSemana]}</div>
-                      {linha.map((valor, hora) => (
-                        <div
-                          key={hora}
-                          title={`${DIAS[diaSemana]} ${String(hora).padStart(2, "0")}h: ${valor} turno(s)`}
-                          className="size-6 shrink-0 rounded-sm bg-muted/40"
-                          style={valor > 0 ? { backgroundColor: corDaCelula(valor, max) } : undefined}
-                        />
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                </TooltipProvider>
               </div>
 
               <div className="flex items-center gap-2 pl-12">
