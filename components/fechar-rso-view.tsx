@@ -122,6 +122,15 @@ export function FecharRsoView({
     }
   }
 
+  function abrirConfirmacao() {
+    const faltando = boletins.some((boletim) => !(numerosBopm[boletim.id] ?? "").trim());
+    if (faltando) {
+      toast.error("Informe o número no sistema de todos os BOPMs antes de fechar o serviço.");
+      return;
+    }
+    setConfirmOpen(true);
+  }
+
   async function confirmarFechamento() {
     setConfirmOpen(false);
     setConfirmando(true);
@@ -164,7 +173,9 @@ export function FecharRsoView({
         </CardHeader>
         {boletins.length > 0 && (
           <CardContent className="flex flex-col gap-3 border-b border-border/60 pb-5">
-            <Label>Números dos BOPMs no sistema da cidade</Label>
+            <Label>
+              Números dos BOPMs no sistema da cidade <span className="text-primary">*</span>
+            </Label>
             {boletins.map((boletim) => (
               <div key={boletim.id} className="grid grid-cols-[1fr_auto] items-center gap-3">
                 <span className="min-w-0 truncate text-sm text-muted-foreground" title={boletim.natureza}>
@@ -175,6 +186,7 @@ export function FecharRsoView({
                   className="w-36"
                   value={numerosBopm[boletim.id] ?? ""}
                   onChange={(e) => setNumerosBopm((prev) => ({ ...prev, [boletim.id]: e.target.value }))}
+                  aria-invalid={!(numerosBopm[boletim.id] ?? "").trim()}
                 />
               </div>
             ))}
@@ -223,7 +235,7 @@ export function FecharRsoView({
           <Button variant="ghost" onClick={onCancelar} disabled={confirmando}>
             Cancelar
           </Button>
-          <Button onClick={() => setConfirmOpen(true)} disabled={confirmando}>
+          <Button onClick={abrirConfirmacao} disabled={confirmando}>
             {confirmando ? "Fechando..." : "Confirmar fechamento"}
           </Button>
         </CardFooter>

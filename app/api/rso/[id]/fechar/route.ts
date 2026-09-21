@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { closeRso, getRsoById, pertenceAGuarnicao } from "@/lib/rsoStore";
-import { salvarNumerosSistema } from "@/lib/boletimStore";
+import { listBoletinsByRso, salvarNumerosSistema } from "@/lib/boletimStore";
 import type { EstadoRso } from "@/lib/rsoEstado";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +27,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!estado || !texto || !texto.trim()) {
     return NextResponse.json({ error: "Estado e texto final são obrigatórios." }, { status: 400 });
+  }
+
+  const boletins = await listBoletinsByRso(id);
+  const faltando = boletins.some((boletim) => !numerosBopm?.[boletim.id]?.trim());
+  if (faltando) {
+    return NextResponse.json(
+      { error: "Informe o número no sistema de todos os BOPMs antes de fechar o serviço." },
+      { status: 400 },
+    );
   }
 
   try {

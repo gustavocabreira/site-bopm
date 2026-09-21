@@ -134,6 +134,47 @@ export async function listRsosByUser(discordUserId: string, limit = 100): Promis
   return data.map(mapRow);
 }
 
+export interface FiltrosRsoAdmin {
+  status?: "aberto" | "fechado";
+  /** Data inicial (inclusive), ISO, comparado com iniciado_em. */
+  de?: string;
+  /** Data final (inclusive), ISO, comparado com iniciado_em. */
+  ate?: string;
+  /** ID Discord de um integrante da guarnição (qualquer posto) ou de quem abriu o RSO. */
+  discordUserId?: string;
+}
+
+const POSTOS_GUARNICAO = [
+  "discord_user_id",
+  "chefe_equipe",
+  "motorista",
+  "homem3",
+  "homem4",
+  "r1_encarregado",
+  "r2_apoio_tatico",
+  "r3_interventor",
+];
+
+/** Lista RSOs (abertos e/ou encerrados) para a tela de supervisão administrativa, mais recentes primeiro. */
+export async function listRsosAdmin(filtros: FiltrosRsoAdmin = {}, limit = 300): Promise<RsoSalvo[]> {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase.from("rsos").select(SELECT_COLUMNS);
+
+  if (filtros.status === "aberto") query = query.is("encerrado_em", null);
+  if (filtros.status === "fechado") query = query.not("encerrado_em", "is", null);
+  if (filtros.de) query = query.gte("iniciado_em", filtros.de);
+  if (filtros.ate) query = query.lte("iniciado_em", filtros.ate);
+  if (filtros.discordUserId) {
+    query = query.or(POSTOS_GUARNICAO.map((coluna) => `${coluna}.eq.${filtros.discordUserId}`).join(","));
+  }
+
+  const { data, error } = await query.order("iniciado_em", { ascending: false }).limit(limit);
+
+  if (error) console.error("listRsosAdmin:", error.message);
+  if (error || !data) return [];
+  return data.map(mapRow);
+}
+
 export async function getRsoById(id: string): Promise<RsoSalvo | null> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.from("rsos").select(SELECT_COLUMNS).eq("id", id).maybeSingle();
