@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { MatrizHeatmapTurnos } from "@/lib/turnosHeatmap";
@@ -86,7 +87,31 @@ export function TurnosHeatmap() {
       </Card>
 
       {carregando ? (
-        <p className="text-sm text-muted-foreground">Carregando...</p>
+        <>
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <Skeleton className="h-5 w-64" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1.5">
+              {DIAS.map((dia) => (
+                <div key={dia} className="flex items-center gap-1">
+                  <Skeleton className="h-4 w-9 shrink-0" />
+                  <Skeleton className="h-6 flex-1" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <Skeleton className="h-5 w-48" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-56" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-52" />
+            </CardContent>
+          </Card>
+        </>
       ) : semDados ? (
         <p className="text-sm text-muted-foreground">Nenhum turno nesse período.</p>
       ) : (

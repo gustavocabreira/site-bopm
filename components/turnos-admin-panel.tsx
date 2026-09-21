@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { MembroCombobox } from "@/components/membro-combobox";
@@ -179,7 +180,25 @@ export function TurnosAdminPanel() {
       </Card>
 
       {carregando ? (
-        <p className="text-sm text-muted-foreground">Carregando turnos...</p>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Card key={i} className="shadow-sm">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Skeleton className="h-5 w-20" />
+                  <Skeleton className="h-5 w-24" />
+                </div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
       ) : turnos.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum turno encontrado com esses filtros.</p>
       ) : (
