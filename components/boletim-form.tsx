@@ -433,7 +433,7 @@ export function BoletimForm({ rso, onPublicado }: BoletimFormProps = {}) {
                               value={fields.prefixo}
                               onValueChange={(value) => value && updateField("prefixo", value)}
                             >
-                              <SelectTrigger id={question.key} className="w-full">
+                              <SelectTrigger id={question.key} className="w-full data-[size=default]:h-10">
                                 <SelectValue placeholder="Selecione o prefixo" />
                               </SelectTrigger>
                               <SelectContent>

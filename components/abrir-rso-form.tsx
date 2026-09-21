@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { GuarnicaoRsoFields } from "@/components/guarnicao-rso-fields";
 import { PREFIXOS_VIATURA, type CrewSnapshot, type TipoViatura } from "@/lib/rsoEstado";
+import { getDataHoraAtual } from "@/lib/dateFormatter";
 
 type FormularioRso = CrewSnapshot & {
   turno: string;
@@ -23,23 +24,25 @@ type FormularioRso = CrewSnapshot & {
   prefixo: string;
 };
 
-const FORMULARIO_VAZIO: FormularioRso = {
-  turno: "",
-  viatura: "",
-  prefixo: "",
-  chefeEquipe: "",
-  motorista: "",
-  homem3: "",
-  homem4: "",
-  r1Encarregado: "",
-  r2ApoioTatico: "",
-  r3Interventor: "",
-};
+function formularioVazio(): FormularioRso {
+  return {
+    turno: getDataHoraAtual().horario,
+    viatura: "",
+    prefixo: "",
+    chefeEquipe: "",
+    motorista: "",
+    homem3: "",
+    homem4: "",
+    r1Encarregado: "",
+    r2ApoioTatico: "",
+    r3Interventor: "",
+  };
+}
 
 export function AbrirRsoForm() {
   const router = useRouter();
   const [tipo, setTipo] = useState<TipoViatura>("quatro_rodas");
-  const [form, setForm] = useState<FormularioRso>(FORMULARIO_VAZIO);
+  const [form, setForm] = useState<FormularioRso>(formularioVazio);
   const [enviando, setEnviando] = useState(false);
 
   function updateField(key: keyof FormularioRso, value: string) {
@@ -147,7 +150,7 @@ export function AbrirRsoForm() {
                 value={form.prefixo}
                 onValueChange={(value) => value && updateField("prefixo", value)}
               >
-                <SelectTrigger id="prefixo" className="w-full">
+                <SelectTrigger id="prefixo" className="w-full data-[size=default]:h-10">
                   <SelectValue placeholder="Selecione o prefixo" />
                 </SelectTrigger>
                 <SelectContent>

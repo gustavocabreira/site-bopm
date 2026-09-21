@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 items-center justify-center p-4">
       <Card className="w-full max-w-sm border-border/60 shadow-lg">
-        <CardHeader className="items-center text-center gap-3">
+        <CardHeader className="items-center justify-items-center text-center gap-3">
           <div className="flex size-14 items-center justify-center rounded-lg bg-primary/15 text-primary ring-1 ring-primary/30">
             <ShieldCheck className="size-7" strokeWidth={1.75} />
           </div>
