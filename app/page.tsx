@@ -1,10 +1,11 @@
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { ShieldCheck, ListChecks, BarChart3, CalendarClock } from "lucide-react";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminUser } from "@/lib/auth";
 import { UserMenu } from "@/components/user-menu";
 import { AbrirRsoForm } from "@/components/abrir-rso-form";
 import { ServicoAtivo } from "@/components/servico-ativo";
+import { SincronizarUsuariosButton } from "@/components/sincronizar-usuarios-button";
 import { Button } from "@/components/ui/button";
 import { listBoletinsByRso } from "@/lib/boletimStore";
 import { getOpenRsoParaUsuario, listRemodulacoes } from "@/lib/rsoStore";
@@ -55,6 +56,7 @@ export default async function Home() {
               <BarChart3 className="size-4" />
               <span className="hidden sm:inline">Relatórios</span>
             </Button>
+            {isAdminUser(session?.user?.id) && <SincronizarUsuariosButton />}
             <UserMenu name={session?.user?.name} image={session?.user?.image} />
           </div>
         </div>

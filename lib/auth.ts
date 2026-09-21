@@ -3,6 +3,13 @@ import DiscordProvider from "next-auth/providers/discord";
 
 export const REQUIRED_GUILD_ID = "1477840333021778040";
 
+/** IDs Discord com acesso a ações administrativas (ex.: botão "Sincronizar usuários"). */
+export const ADMIN_DISCORD_IDS = ["270399024241049600", "684204886572924928"];
+
+export function isAdminUser(discordId: string | null | undefined): boolean {
+  return !!discordId && ADMIN_DISCORD_IDS.includes(discordId);
+}
+
 interface DiscordGuildMember {
   nick?: string | null;
   user?: { global_name?: string | null; username?: string | null };
