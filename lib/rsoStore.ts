@@ -175,6 +175,18 @@ export async function listRsosAdmin(filtros: FiltrosRsoAdmin = {}, limit = 300):
   return data.map(mapRow);
 }
 
+/** Só início/fim de todos os RSOs (aberto ou não), para o mapa de calor de dia/horário — não precisa dos demais campos. */
+export async function listTurnosParaHeatmap(): Promise<{ iniciadoEm: string; encerradoEm: string | null }[]> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.from("rsos").select("iniciado_em, encerrado_em");
+
+  if (error || !data) return [];
+  return data.map((row) => ({
+    iniciadoEm: row.iniciado_em as string,
+    encerradoEm: (row.encerrado_em as string | null) ?? null,
+  }));
+}
+
 export async function getRsoById(id: string): Promise<RsoSalvo | null> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.from("rsos").select(SELECT_COLUMNS).eq("id", id).maybeSingle();

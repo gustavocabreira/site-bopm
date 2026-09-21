@@ -16,7 +16,7 @@ const LINKS = [
   { href: "/", label: "Início", icon: ShieldCheck },
   { href: "/meus-turnos", label: "Meus turnos", icon: CalendarClock },
   { href: "/boletins", label: "Boletins", icon: ListChecks },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/relatorios", label: "Horários de turnos", icon: BarChart3 },
 ];
 
 const LINK_ADMIN = { href: "/admin/turnos", label: "Supervisão de turnos", icon: Users2 };
