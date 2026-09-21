@@ -20,13 +20,13 @@ export interface EstadoBoletim {
   artigos: string | null;
 }
 
-/** Campos de texto simples do boletim — usados para copiar/validar valores inalterados na revisão via IA. */
+/**
+ * Campos de texto simples do boletim — usados para copiar/validar valores
+ * inalterados na revisão via IA. Não inclui os campos de equipe (agora
+ * guardam o ID da conta do Discord, não texto).
+ */
 export const CAMPOS_TEXTO_ESTADO_BOLETIM = [
   "prefixo",
-  "chefeEquipe",
-  "motorista",
-  "homem3",
-  "homem4",
   "local",
   "veiculo",
   "relato",

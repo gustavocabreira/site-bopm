@@ -20,11 +20,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { QUESTIONS, CREW_KEYS, type BoletimFields, type QuestionKey } from "@/lib/questions";
+import { QUESTIONS, CREW_KEYS, LABELS_EQUIPE_ROCAM, type BoletimFields, type QuestionKey } from "@/lib/questions";
 import { buildBoletim, buildBoletimTextoPuro } from "@/lib/boletimTemplate";
 import { getDataHoraAtual } from "@/lib/dateFormatter";
+import { MembroCombobox } from "@/components/membro-combobox";
 import type { EstadoBoletim, Individuo } from "@/lib/boletimEstado";
 import type { MaterialApreendido } from "@/lib/materiais";
+import type { TipoViatura } from "@/lib/rsoEstado";
+import type { MembroGuilda } from "@/lib/membroGuilda";
+
+/** Campos de equipe selecionados pelo MembroCombobox (guardam ID da conta do Discord), não digitados livremente. */
+const CHAVES_EQUIPE = new Set<QuestionKey>(["chefeEquipe", "motorista", "homem3", "homem4"]);
 
 type Phase = "collecting" | "loading" | "review";
 
@@ -49,10 +55,18 @@ const EMPTY_FIELDS: BoletimFields = {
 
 const EMPTY_INDIVIDUO: Individuo = { nome: "", rg: "" };
 
-const SECOES: { titulo: string; chaves: QuestionKey[] }[] = [
-  { titulo: "Equipe", chaves: ["prefixo", "chefeEquipe", "motorista", "homem3", "homem4"] },
-  { titulo: "Ocorrência", chaves: ["local", "veiculo", "relatoBruto"] },
-];
+function secoesParaTipo(tipo: TipoViatura): { titulo: string; chaves: QuestionKey[] }[] {
+  return [
+    {
+      titulo: "Equipe",
+      chaves:
+        tipo === "rocam"
+          ? ["prefixo", "chefeEquipe", "motorista", "homem3"]
+          : ["prefixo", "chefeEquipe", "motorista", "homem3", "homem4"],
+    },
+    { titulo: "Ocorrência", chaves: ["local", "veiculo", "relatoBruto"] },
+  ];
+}
 
 const questionsByKey = Object.fromEntries(QUESTIONS.map((q) => [q.key, q])) as Record<
   QuestionKey,
@@ -68,8 +82,16 @@ function individuosPreenchidos(lista: Individuo[]): Individuo[] {
   return lista.filter((individuo) => individuo.nome.trim() || individuo.rg.trim());
 }
 
-export function BoletimForm() {
-  const [fields, setFields] = useState<BoletimFields>(EMPTY_FIELDS);
+interface BoletimFormProps {
+  /** Quando informado, o BOPM pertence a um RSO em aberto: a equipe já vem preenchida com a guarnição do serviço (em vez de buscar a última guarnição salva), o boletim sai vinculado a esse RSO, e a seção EQUIPE do texto final segue o formato do tipo de viatura (composição R1/R2/R3 no ROCAM). */
+  rso?: { id: string; crew: Partial<BoletimFields>; tipo: TipoViatura };
+  onPublicado?: () => void;
+}
+
+export function BoletimForm({ rso, onPublicado }: BoletimFormProps = {}) {
+  const tipo = rso?.tipo ?? "quatro_rodas";
+  const SECOES = secoesParaTipo(tipo);
+  const [fields, setFields] = useState<BoletimFields>(() => ({ ...EMPTY_FIELDS, ...rso?.crew }));
   const [individuos, setIndividuos] = useState<Individuo[]>([{ ...EMPTY_INDIVIDUO }]);
   const [phase, setPhase] = useState<Phase>("collecting");
   const [conteudo, setConteudo] = useState<ConteudoGerado | null>(null);
@@ -78,8 +100,19 @@ export function BoletimForm() {
   const [enviandoComplemento, setEnviandoComplemento] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [publicado, setPublicado] = useState(false);
+  const [membros, setMembros] = useState<MembroGuilda[]>([]);
 
   useEffect(() => {
+    fetch("/api/discord/membros")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.membros)) setMembros(data.membros);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (rso) return;
     fetch("/api/crew")
       .then((res) => res.json())
       .then((data) => {
@@ -89,6 +122,7 @@ export function BoletimForm() {
         }
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function updateField(key: QuestionKey, value: string) {
@@ -110,7 +144,8 @@ export function BoletimForm() {
   function validar(): boolean {
     for (const question of QUESTIONS) {
       if (!question.optional && !fields[question.key].trim()) {
-        toast.error(`Preencha o campo "${question.label}".`);
+        const label = tipo === "rocam" ? (LABELS_EQUIPE_ROCAM[question.key] ?? question.label) : question.label;
+        toast.error(`Preencha o campo "${label}".`);
         return false;
       }
     }
@@ -226,19 +261,21 @@ export function BoletimForm() {
       materiaisApreendidos: conteudo.materiaisApreendidos,
       relato: conteudo.relato,
       artigos: conteudo.artigos,
-    });
+    }, tipo, membros);
 
-    fetch("/api/crew", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prefixo: fields.prefixo,
-        chefeEquipe: fields.chefeEquipe,
-        motorista: fields.motorista,
-        homem3: fields.homem3,
-        homem4: fields.homem4,
-      }),
-    }).catch(() => {});
+    if (!rso) {
+      fetch("/api/crew", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prefixo: fields.prefixo,
+          chefeEquipe: fields.chefeEquipe,
+          motorista: fields.motorista,
+          homem3: fields.homem3,
+          homem4: fields.homem4,
+        }),
+      }).catch(() => {});
+    }
 
     try {
       const res = await fetch("/api/boletins", {
@@ -274,6 +311,8 @@ export function BoletimForm() {
       return;
     }
 
+    onPublicado?.();
+
     setPublicado(true);
     toast.success("Boletim confirmado.");
   }
@@ -289,8 +328,8 @@ export function BoletimForm() {
       materiaisApreendidos: conteudo?.materiaisApreendidos ?? [],
       relato: conteudo?.relato || fields.relatoBruto || "—",
       artigos: conteudo?.artigos ?? "",
-    });
-  }, [fields, individuos, conteudo, dataHora]);
+    }, tipo, membros);
+  }, [fields, individuos, conteudo, dataHora, tipo, membros]);
 
   async function copiarTexto() {
     if (!conteudo || !dataHora) {
@@ -306,7 +345,7 @@ export function BoletimForm() {
       materiaisApreendidos: conteudo.materiaisApreendidos,
       relato: conteudo.relato,
       artigos: conteudo.artigos,
-    });
+    }, tipo, membros);
 
     try {
       await navigator.clipboard.writeText(texto);
@@ -363,7 +402,7 @@ export function BoletimForm() {
                           className={`flex flex-col gap-1.5 ${question.multiline ? "sm:col-span-2" : ""}`}
                         >
                           <Label htmlFor={question.key}>
-                            {question.label}
+                            {tipo === "rocam" ? (LABELS_EQUIPE_ROCAM[question.key] ?? question.label) : question.label}
                             {!question.optional && <span className="text-primary"> *</span>}
                           </Label>
                           {question.multiline ? (
@@ -373,6 +412,14 @@ export function BoletimForm() {
                               value={fields[question.key]}
                               onChange={(e) => updateField(question.key, e.target.value)}
                               rows={6}
+                            />
+                          ) : CHAVES_EQUIPE.has(question.key) ? (
+                            <MembroCombobox
+                              id={question.key}
+                              placeholder={question.placeholder}
+                              value={fields[question.key]}
+                              onChange={(valor) => updateField(question.key, valor)}
+                              membros={membros}
                             />
                           ) : (
                             <Input

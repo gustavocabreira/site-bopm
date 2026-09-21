@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { listBoletins, saveBoletim } from "@/lib/boletimStore";
+import { getOpenRsoParaUsuario } from "@/lib/rsoStore";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -42,10 +43,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Dados incompletos para salvar o boletim." }, { status: 400 });
   }
 
+  const rso = await getOpenRsoParaUsuario(session.user.id);
+  if (!rso) {
+    return NextResponse.json(
+      { error: "Nenhum serviço em aberto — abra um RSO (ou entre na guarnição de um) antes de gerar o boletim." },
+      { status: 409 },
+    );
+  }
+
   try {
     await saveBoletim({
       discordUserId: session.user.id,
       discordUserName: session.user.name ?? null,
+      rsoId: rso.id,
       prefixo,
       chefeEquipe: chefeEquipe ?? "",
       motorista: motorista ?? "",

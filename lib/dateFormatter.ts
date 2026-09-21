@@ -24,3 +24,12 @@ export function getDataHoraAtual(offsetMinutos = -5) {
     horario: `${partes.hour}:${partes.minute}`,
   };
 }
+
+/** Formata uma duração em milissegundos como HH:MM:SS, usado no tempo de serviço ao vivo. */
+export function formatarDuracao(ms: number): string {
+  const totalSegundos = Math.max(0, Math.floor(ms / 1000));
+  const horas = Math.floor(totalSegundos / 3600);
+  const minutos = Math.floor((totalSegundos % 3600) / 60);
+  const segundos = totalSegundos % 60;
+  return [horas, minutos, segundos].map((valor) => String(valor).padStart(2, "0")).join(":");
+}

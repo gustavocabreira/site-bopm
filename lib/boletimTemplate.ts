@@ -1,5 +1,8 @@
 import type { Individuo } from "./boletimEstado";
 import { formatarMateriaisApreendidos, type MaterialApreendido } from "./materiais";
+import type { TipoViatura } from "./rsoEstado";
+import { nomeDoMembro } from "./resolverNome";
+import type { MembroGuilda } from "./membroGuilda";
 
 const SEPARADOR = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
 
@@ -18,6 +21,35 @@ export interface BoletimData {
   materiaisApreendidos: MaterialApreendido[];
   relato: string;
   artigos: string | null;
+}
+
+/**
+ * Linhas da seção EQUIPE — no ROCAM usa a composição R1/R2/R3 em vez de
+ * chefe/motorista/homens auxiliares (os mesmos campos chefeEquipe/motorista/
+ * homem3 são reaproveitados com o rótulo do posto, sem 4° homem). Os campos
+ * guardam o ID da conta do Discord de cada integrante; `membros` resolve pro
+ * nome atual (cai no próprio valor guardado se não achar).
+ */
+function linhasEquipe(fields: BoletimData, tipo: TipoViatura, markdown: boolean, membros: MembroGuilda[]): string[] {
+  const rotulo = (texto: string) => (markdown ? `**${texto}**` : texto);
+  const nome = (id: string) => (id ? nomeDoMembro(id, membros) : "");
+
+  if (tipo === "rocam") {
+    return [
+      rotulo("EQUIPE:"),
+      `${rotulo("R1 - Encarregado:")} ${nome(fields.chefeEquipe)}`,
+      `${rotulo("R2 - Apoio Tático:")} ${nome(fields.motorista)}`,
+      `${rotulo("R3 - Interventor:")} ${fields.homem3 ? nome(fields.homem3) : "N/A"}`,
+    ];
+  }
+
+  return [
+    rotulo("EQUIPE:"),
+    `${rotulo("Chefe da Equipe:")} ${nome(fields.chefeEquipe)}`,
+    `${rotulo("Motorista:")} ${nome(fields.motorista)}`,
+    `${rotulo("3° Homem Auxiliar:")} ${nome(fields.homem3)}`,
+    `${rotulo("4° Homem Auxiliar:")} ${nome(fields.homem4)}`,
+  ];
 }
 
 function linhasIndividuos(individuos: Individuo[], markdown: boolean): string[] {
@@ -52,7 +84,7 @@ function linhasIndividuos(individuos: Individuo[], markdown: boolean): string[] 
  * Monta o texto final do BOPM BAEP a partir dos campos coletados e do conteudo
  * gerado (natureza, materiais apreendidos, artigos). Funcao pura e deterministica.
  */
-export function buildBoletim(fields: BoletimData): string {
+export function buildBoletim(fields: BoletimData, tipo: TipoViatura = "quatro_rodas", membros: MembroGuilda[] = []): string {
   const linhas = [
     "# BOLETIM DE OCORRÊNCIA DA POLÍCIA MILITAR DE SÃO PAULO",
     SEPARADOR,
@@ -61,11 +93,7 @@ export function buildBoletim(fields: BoletimData): string {
     "",
     `**DATA E HORA:** ${fields.data} ${fields.horario}`,
     `**UNIDADE DE SERVIÇO:** Prefixo: ${fields.prefixo}`,
-    "**EQUIPE:**",
-    `**Chefe da Equipe:** ${fields.chefeEquipe}`,
-    `**Motorista:** ${fields.motorista}`,
-    `**3° Homem Auxiliar:** ${fields.homem3 || ""}`,
-    `**4° Homem Auxiliar:** ${fields.homem4 || ""}`,
+    ...linhasEquipe(fields, tipo, true, membros),
     SEPARADOR,
     "",
     "# DADOS DA OCORRÊNCIA",
@@ -91,7 +119,7 @@ export function buildBoletim(fields: BoletimData): string {
  * Mesma estrutura do buildBoletim, mas sem marcacao markdown (** e #) —
  * usado pelo botao "Copiar texto", pensado para colar em outros sistemas.
  */
-export function buildBoletimTextoPuro(fields: BoletimData): string {
+export function buildBoletimTextoPuro(fields: BoletimData, tipo: TipoViatura = "quatro_rodas", membros: MembroGuilda[] = []): string {
   const linhas = [
     "BOLETIM DE OCORRÊNCIA DA POLÍCIA MILITAR DE SÃO PAULO",
     SEPARADOR,
@@ -100,11 +128,7 @@ export function buildBoletimTextoPuro(fields: BoletimData): string {
     "",
     `DATA E HORA: ${fields.data} ${fields.horario}`,
     `UNIDADE DE SERVIÇO: Prefixo: ${fields.prefixo}`,
-    "EQUIPE:",
-    `Chefe da Equipe: ${fields.chefeEquipe}`,
-    `Motorista: ${fields.motorista}`,
-    `3° Homem Auxiliar: ${fields.homem3 || ""}`,
-    `4° Homem Auxiliar: ${fields.homem4 || ""}`,
+    ...linhasEquipe(fields, tipo, false, membros),
     SEPARADOR,
     "",
     "DADOS DA OCORRÊNCIA",

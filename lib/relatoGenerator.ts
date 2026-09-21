@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic } from "./anthropicClient";
 import { CAMPOS_TEXTO_ESTADO_BOLETIM, type EstadoBoletim, type Individuo } from "./boletimEstado";
+import { CODIGO_PENAL_GUARULHOS } from "./codigoPenalGuarulhos";
 import { CATEGORIAS_MATERIAL, UNIDADES_MATERIAL, type MaterialApreendido } from "./materiais";
 
 const MODEL = "claude-haiku-4-5";
@@ -26,24 +27,41 @@ Regras obrigatórias:
 const NENHUM = "NENHUM";
 
 /** Formato do campo ARTIGOS, compartilhado entre a geração inicial e a revisão para o resultado nunca sair com um padrão diferente (ex.: tudo numa linha, separado por "; " ou ","). */
-const FORMATO_ARTIGOS = `- O campo de artigos deve conter SEMPRE um artigo por linha (quebra de linha real, "\\n"), sem marcadores, travessões, ponto e vírgula ou vírgula separando os artigos, e sem nome popular do crime — apenas no formato "Art. X do(a) [lei/código]" (ex.: "Art. 155 do Código Penal", "Art. 289 do Código Penal", "Art. 33 da Lei 11.343/06"). Nunca junte dois artigos na mesma linha nem troque "do"/"da" por vírgula.`;
+const FORMATO_ARTIGOS = `- O campo de artigos deve conter SEMPRE um artigo por linha (quebra de linha real, "\\n"), sem marcadores, travessões, ponto e vírgula ou vírgula separando os artigos, e sem nome popular do crime — apenas no formato "Art. X do Código Penal de Guarulhos" (ex.: "Art. 155 do Código Penal de Guarulhos", "Art. 289-A do Código Penal de Guarulhos", "Art. 33 do Código Penal de Guarulhos"). Nunca junte dois artigos na mesma linha nem troque "do" por vírgula.
+- Cite SEMPRE "do Código Penal de Guarulhos" como a lei/código, independente de o artigo estar listado sob um capítulo com nome de outra lei (ex.: "DA LEI DE DROGAS", "DO ESTATUTO DO DESARMAMENTO", "DOS CRIMES DE TRÂNSITO (CTB)") — é tudo parte do mesmo Código Penal de Guarulhos.`;
 
-/** Regras de tipificação penal compartilhadas entre a geração inicial dos ARTIGOS e a revisão via IA — mantidas em um único lugar para não divergirem. */
-const REGRAS_TIPIFICACAO_ARTIGOS = `- Sempre que houver menção a "dinheiro sujo" (valores em espécie associados a atividade ilícita), inclua também o Art. 289 do Código Penal na lista de artigos.
-- Sempre que houver apreensão de arma de fogo (ex.: pistola, revólver) mencionada no relato ou em uma instrução de revisão, inclua também o Art. 12 da Lei 10.826/03 (posse/porte de arma de fogo) na lista de artigos, além de qualquer outro artigo aplicável aos demais fatos.
-- Sempre que houver apreensão de munição, inclua também um artigo referente à quantidade apreendida: até 50 (cinquenta) unidades, use o Art. 17 da Lei 10.826/03; acima de 50 (cinquenta) unidades, use o Art. 17, §1º, da Lei 10.826/03 (em vez do Art. 17 simples). Se a quantidade de munição mudar numa revisão (ex.: de 30 para 80), atualize esse artigo de acordo com a nova quantidade.`;
+/**
+ * Regras de tipificação penal compartilhadas entre a geração inicial dos
+ * ARTIGOS e a revisão via IA — mantidas em um único lugar para não
+ * divergirem. Reforçam as cláusulas de presunção/limiar do próprio Código
+ * Penal de Guarulhos (que já aparecem no texto abaixo), porque são fáceis
+ * de passar batido numa leitura corrida do relato.
+ */
+const REGRAS_TIPIFICACAO_ARTIGOS = `- NUNCA repita o mesmo artigo mais de uma vez na lista, mesmo que ele se aplique a vários itens ou pessoas diferentes (ex.: duas armas de uso restrito geram só UMA linha "Art. 16", não duas).
+- Dinheiro apreendido de origem ilícita ("dinheiro sujo"): inclua sempre o Art. 289-A (Posse de dinheiro ilícito).
+- Arma de fogo apreendida em via pública (abordagem, revista pessoal etc., fora de residência): se for Revólver calibre 38 ou Beretta (as únicas "armas de uso permitido" listadas no Art. 14), use o Art. 14 (Porte ilegal de arma de uso permitido). Qualquer outro modelo/calibre de arma de fogo é "uso restrito" e usa o Art. 16 em vez do Art. 14. NUNCA cite o Art. 12 junto com o Art. 14 ou o Art. 16 para a mesma arma — o Art. 12 é exclusivo para arma guardada dentro de residência sem registro (situação diferente e rara num BOPM de abordagem em via pública); se o relato não mencionar claramente uma residência, não use o Art. 12.
+- 2 (duas) ou mais armas de fogo apreendidas, de qualquer calibre, com a mesma pessoa ou no mesmo veículo/local: inclua também o Art. 17 (Comércio ilegal de armas), além do artigo de porte cabível (Art. 14 e/ou Art. 16, sem repetir).
+- Munição apreendida: só inclua um artigo específico de munição quando a quantidade total for igual ou superior a 80 (oitenta) unidades — nesse caso, inclua o Art. 17 (Comércio ilegal de munições). Abaixo de 80 unidades, não force nenhum artigo de munição isolado.
+- Drogas apreendidas: some a quantidade de todas as substâncias apreendidas; se o total for igual ou superior a 5 (cinco), inclua o Art. 33 (Tráfico de drogas) mesmo sem indício explícito de dolo de tráfico no relato.
+- Art. 157-A (Subtração de viatura) só se aplica quando o veículo subtraído for EXPLICITAMENTE um veículo oficial das forças de segurança (viatura policial, viatura da GCM etc.) — NUNCA use esse artigo para um veículo civil/particular comum, mesmo em um roubo ou furto de veículo; nesse caso use só o Art. 155 (Furto) ou Art. 157 (Roubo), conforme o caso.
+- Subtração de caixa eletrônico (explosão, arrombamento, furto ou "roubo" a caixa eletrônico): nesta cidade não existe roubo à mão armada contra caixa eletrônico, então use SEMPRE o Art. 155 (Furto) nesse caso, mesmo que o relato descreva o fato como "roubo" ou cite arma/ameaça na ação contra o caixa eletrônico — NUNCA use o Art. 157 (Roubo) pra esse tipo de ocorrência.
+- Se a quantidade de armas, munição ou drogas mudar numa revisão, reavalie esses limiares e ajuste os artigos de acordo com a nova quantidade.`;
 
-const SYSTEM_PROMPT_ARTIGOS = `Você é um assistente que identifica os ARTIGOS de lei penal aplicáveis a uma ocorrência policial a partir do relato completo, no padrão usado em boletins de ocorrência da Polícia Militar de São Paulo.
+const SYSTEM_PROMPT_ARTIGOS = `Você é um assistente que identifica os ARTIGOS do Código Penal de Guarulhos aplicáveis a uma ocorrência policial a partir do relato completo, no padrão usado em boletins de ocorrência.
+
+O Código Penal de Guarulhos é FICTÍCIO, criado só para o roleplay do servidor Guarulhos — é a ÚNICA base de tipificação que você deve usar. NUNCA cite o Código Penal brasileiro real, o Estatuto do Desarmamento real, a Lei de Drogas real ou qualquer outra lei real: mesmo quando o texto abaixo organiza os artigos em capítulos com nomes de leis reais (ex.: "DA LEI DE DROGAS", "DO ESTATUTO DO DESARMAMENTO"), esses artigos pertencem ao Código Penal de Guarulhos e devem ser citados como tal.
+
+${CODIGO_PENAL_GUARULHOS}
 
 Regras obrigatórias:
-- Leia o relato e identifique o(s) artigo(s) de lei penal brasileira que se aplicam de forma CLARA E INEQUÍVOCA aos fatos descritos.
+- Leia o relato e identifique o(s) artigo(s) do Código Penal de Guarulhos acima que se aplicam de forma CLARA E INEQUÍVOCA aos fatos descritos.
 ${FORMATO_ARTIGOS}
-- NÃO invente, suponha ou arrisque uma tipificação penal quando os fatos do relato forem insuficientes ou ambíguos para determiná-la com segurança.
+- NÃO invente, suponha ou arrisque uma tipificação penal quando os fatos do relato forem insuficientes ou ambíguos para determiná-la com segurança, e NÃO invente artigos que não estejam no texto do Código Penal de Guarulhos acima.
 ${REGRAS_TIPIFICACAO_ARTIGOS}
 - Se não for possível determinar com segurança nenhum artigo aplicável, responda exatamente com a palavra ${NENHUM}, sem mais nada.
-- Não adicione explicações, cabeçalhos, aspas ou comentários além da lista (ou da palavra ${NENHUM}).`;
+- Não adicione explicações, cabeçalhos, aspas, penas ou comentários além da lista de artigos (ou da palavra ${NENHUM}).`;
 
-function mapAnthropicError(error: unknown): Error {
+export function mapAnthropicError(error: unknown): Error {
   if (error instanceof Anthropic.RateLimitError) {
     return new Error("Limite de requisicoes da API Anthropic atingido. Tente novamente em instantes.");
   }
@@ -259,14 +277,17 @@ const SYSTEM_PROMPT_REVISAO = `Você é um assistente que revisa boletins de oco
 Você recebe o ESTADO ATUAL do boletim (todos os campos, em JSON) e uma INSTRUÇÃO do agente pedindo uma correção ou complemento.
 
 Regras obrigatórias:
-- Identifique exatamente a qual(is) campo(s) a instrução se refere. Pode ser qualquer campo: dados da equipe (chefe da equipe, motorista, auxiliares, prefixo), indivíduos abordados (nome, RG — pode haver mais de um), local, veículo, natureza dos fatos, materiais apreendidos (categoria, quantidade, unidade, descrição — pode haver mais de um), artigos de lei, ou o relato da ocorrência.
-- Se a instrução disser que um campo está errado e deve ser trocado por outro valor (ex.: "o artigo está errado, deveria ser o Art. 157", "o chefe da equipe está errado, é o Fulano", "a quantidade da droga está errada, era 200 gramas"), substitua diretamente o valor desse campo (ou item da lista) pelo novo, sem inventar justificativas adicionais.
+- Identifique exatamente a qual(is) campo(s) a instrução se refere. Pode ser qualquer campo: prefixo, indivíduos abordados (nome, RG — pode haver mais de um), local, veículo, natureza dos fatos, materiais apreendidos (categoria, quantidade, unidade, descrição — pode haver mais de um), artigos de lei, ou o relato da ocorrência. NÃO altere dados da equipe (chefe da equipe, motorista, auxiliares) — esse campo não está disponível aqui porque agora guarda o ID da conta do Discord de cada integrante, não texto; troca de integrante é só via a tela de Remodulação.
+- Se a instrução disser que um campo está errado e deve ser trocado por outro valor (ex.: "o artigo está errado, deveria ser o Art. 157", "a quantidade da droga está errada, era 200 gramas"), substitua diretamente o valor desse campo (ou item da lista) pelo novo, sem inventar justificativas adicionais.
 - Ao corrigir um item de uma lista (individuos ou materiaisApreendidos), altere apenas o item indicado e mantenha os demais itens da lista intactos, na mesma ordem. Para adicionar um item novo à lista, acrescente-o mantendo os existentes; para remover, exclua apenas o indicado.
-- Se a instrução adicionar um fato novo ou corrigir um fato do RELATO, incorpore isso no relato (texto formal, terceira pessoa, pretérito, linguajar policial brasileiro) na posição cronológica/lógica adequada, e ajuste NATUREZA, MATERIAIS ou ARTIGOS sempre que esse fato novo exigir a mudança — inclusive quando o fato novo alterar a tipificação penal já definida antes, mesmo sem a instrução pedir isso explicitamente. Regras de tipificação que sempre se aplicam, na geração inicial e em toda revisão:
+- Se a instrução adicionar um fato novo ou corrigir um fato do RELATO, incorpore isso no relato (texto formal, terceira pessoa, pretérito, linguajar policial brasileiro) na posição cronológica/lógica adequada, e ajuste NATUREZA, MATERIAIS ou ARTIGOS sempre que esse fato novo exigir a mudança — inclusive quando o fato novo alterar a tipificação penal já definida antes, mesmo sem a instrução pedir isso explicitamente.
+- Ao definir ou corrigir o campo de artigos, use exclusivamente o Código Penal de Guarulhos (fictício, criado só para o roleplay do servidor Guarulhos) abaixo — NUNCA cite o Código Penal brasileiro real, o Estatuto do Desarmamento real, a Lei de Drogas real ou qualquer outra lei real, mesmo que o texto organize artigos em capítulos com nomes de leis reais:
+${CODIGO_PENAL_GUARULHOS}
+Regras de tipificação que sempre se aplicam, na geração inicial e em toda revisão:
 ${REGRAS_TIPIFICACAO_ARTIGOS}
 - Ao devolver o campo de artigos (seja ele alterado ou copiado sem mudança), siga sempre este formato:
 ${FORMATO_ARTIGOS}
-- Se a instrução mudar apenas um dado cadastral (nome de integrante da equipe, RG, prefixo, local, veículo), altere só esse campo — NÃO reescreva o relato nem os demais campos.
+- Se a instrução mudar apenas um dado cadastral (RG, prefixo, local, veículo), altere só esse campo — NÃO reescreva o relato nem os demais campos.
 - Campos e itens de lista que a instrução não menciona e que a mudança não afeta devem ser copiados EXATAMENTE como estavam no estado atual, sem parafrasear, resumir ou reescrever.
 - NÃO invente fatos, nomes, artigos ou dados que não tenham sido citados na instrução ou que já estivessem no estado atual.
 - Responda SEMPRE chamando a ferramenta atualizar_boletim, com todos os campos preenchidos.`;

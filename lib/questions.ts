@@ -74,3 +74,10 @@ export const QUESTIONS: Question[] = [
 export const CREW_KEYS: QuestionKey[] = ["prefixo", "chefeEquipe", "motorista", "homem3", "homem4"];
 
 export type BoletimFields = Record<QuestionKey, string>;
+
+/** Rótulos de composição de viatura da ROCAM — reaproveita os mesmos campos (chefeEquipe/motorista/homem3) com o nome dos postos R1/R2/R3, para não precisar de um schema de BOPM separado. */
+export const LABELS_EQUIPE_ROCAM: Partial<Record<QuestionKey, string>> = {
+  chefeEquipe: "R1 - Encarregado",
+  motorista: "R2 - Apoio Tático",
+  homem3: "R3 - Interventor",
+};
