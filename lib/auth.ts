@@ -49,6 +49,9 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+      // O Discord passou a mandar `iss` no callback (RFC 9207); sem issuer
+      // configurado o openid-client rejeita com "issuer must be configured".
+      issuer: "https://discord.com",
       httpOptions: { timeout: 15000 },
       authorization: { params: { scope: "identify email guilds.members.read" } },
     }),
